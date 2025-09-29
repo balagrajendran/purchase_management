@@ -7,11 +7,19 @@ import { Switch } from './ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
-import { Moon, Sun, Bell, Lock, User, Building, Palette, Save, FileText } from 'lucide-react';
+import { Moon, Sun, Bell, Lock, User, Building, Palette, Save, FileText, LogOut, Shield } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { Breadcrumb } from './Breadcrumb';
 
-export function Settings() {
+interface SettingsProps {
+  onLogout?: () => void;
+  userInfo?: {
+    email: string;
+    role: string;
+  } | null;
+}
+
+export function Settings({ onLogout, userInfo }: SettingsProps) {
   const [settings, setSettings] = useState({
     // Appearance
     theme: 'light',
@@ -69,6 +77,56 @@ export function Settings() {
       <div>
         <p className="text-muted-foreground">Manage your application preferences and configuration</p>
       </div>
+
+      {/* User Profile */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <User className="w-5 h-5" />
+            User Profile
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Email Address</Label>
+              <Input
+                value={userInfo?.email || 'user@fedhubsoftware.com'}
+                disabled
+                className="bg-muted"
+              />
+              <p className="text-sm text-muted-foreground mt-1">Your login email address</p>
+            </div>
+            <div>
+              <Label>Role</Label>
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <Shield className="w-3 h-3" />
+                  {userInfo?.role || 'User'}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">Your access level in the system</p>
+            </div>
+          </div>
+          
+          <Separator />
+          
+          <div className="flex items-center justify-between pt-2">
+            <div>
+              <Label className="text-base">Account Actions</Label>
+              <p className="text-sm text-muted-foreground">Manage your account and session</p>
+            </div>
+            <Button 
+              variant="destructive" 
+              onClick={onLogout}
+              className="flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              Log Out
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Appearance Settings */}
       <Card>

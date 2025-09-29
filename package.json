@@ -1,6 +1,6 @@
 
   {
-      "name": "purchase-management-app",
+      "name": "Purchase Management App",
       "version": "0.1.0",
       "private": true,
       "dependencies": {

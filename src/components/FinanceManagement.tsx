@@ -126,6 +126,13 @@ const paymentMethods = ['Bank Transfer', 'UPI', 'Credit Card', 'Debit Card', 'Ca
 export function FinanceManagement() {
   const [currentView, setCurrentView] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  // Records view specific filters (for compatibility)
+  const [selectedType, setSelectedType] = useState<'invested' | 'expense' | 'tds' | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
   const [financeData, setFinanceData] = useState<FinanceRecord[]>(mockFinanceData);
   const [selectedRecord, setSelectedRecord] = useState<FinanceRecord | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -235,7 +242,10 @@ export function FinanceManagement() {
 
 
 
-  // Filter data
+  // Get unique categories for filter dropdown
+  const uniqueCategories = Array.from(new Set(financeData.map(record => record.category))).sort();
+
+  // Filter data - use appropriate filter state based on current view
   const filteredData = financeData.filter(record => {
     const searchMatch = searchTerm === '' || 
       record.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -243,7 +253,16 @@ export function FinanceManagement() {
       record.paymentMethod.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.reference?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    return searchMatch;
+    // Use overview filters for overview, records filters for records view
+    const currentTypeFilter = currentView === 'records' ? selectedType : typeFilter;
+    const currentCategoryFilter = currentView === 'records' ? selectedCategory : categoryFilter;
+    const currentStatusFilter = currentView === 'records' ? selectedStatus : statusFilter;
+    
+    const typeMatch = currentTypeFilter === 'all' || record.type === currentTypeFilter;
+    const categoryMatch = currentCategoryFilter === 'all' || record.category === currentCategoryFilter;
+    const statusMatch = currentStatusFilter === 'all' || record.status === currentStatusFilter;
+    
+    return searchMatch && typeMatch && categoryMatch && statusMatch;
   });
 
   const breadcrumbItems = [
@@ -430,45 +449,149 @@ export function FinanceManagement() {
           <GlassCard>
             <CardHeader>
               <CardTitle className="bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent flex items-center gap-2">
-                <Search className="h-5 w-5" />
+                <Filter className="h-5 w-5" />
                 <span className="text-sm">Search & Filters</span>
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Search Input */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                  <Input
-                    placeholder="Search by description, category, payment method, or reference..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-white/70 dark:bg-gray-800/70"
-                  />
-                  {searchTerm && (
+                {/* Single Row with Search and Filters */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
+                  {/* Search Input */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Search</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                      <Input
+                        placeholder="Search records..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 bg-white/70 dark:bg-gray-800/70"
+                      />
+                      {searchTerm && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSearchTerm('')}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Type Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Type</Label>
+                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                      <SelectTrigger className="bg-white/70 dark:bg-gray-800/70">
+                        <SelectValue placeholder="All Types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="invested">
+                          <div className="flex items-center space-x-2">
+                            <Wallet className="w-4 h-4 text-green-600" />
+                            <span>Invested</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="expense">
+                          <div className="flex items-center space-x-2">
+                            <TrendingDown className="w-4 h-4 text-red-600" />
+                            <span>Expense</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="tds">
+                          <div className="flex items-center space-x-2">
+                            <Receipt className="w-4 h-4 text-orange-600" />
+                            <span>TDS</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Category Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Category</Label>
+                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                      <SelectTrigger className="bg-white/70 dark:bg-gray-800/70">
+                        <SelectValue placeholder="All Categories" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Categories</SelectItem>
+                        {uniqueCategories.map(category => (
+                          <SelectItem key={category} value={category}>{category}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Status</Label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="bg-white/70 dark:bg-gray-800/70">
+                        <SelectValue placeholder="All Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="completed">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                            <span>Completed</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="pending">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                            <span>Pending</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="failed">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                            <span>Failed</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {/* Clear Filters */}
+                {(searchTerm || typeFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all') && (
+                  <div className="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSearchTerm('')}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setTypeFilter('all');
+                        setCategoryFilter('all');
+                        setStatusFilter('all');
+                      }}
+                      className="text-muted-foreground hover:text-foreground"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-4 h-4 mr-1" />
+                      Clear Filters
                     </Button>
-                  )}
-                </div>
+                  </div>
+                )}
                 
                 {/* Results Counter */}
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
-                    {searchTerm ? (
-                      <>Showing {filteredData.length} of {financeData.length} records for "{searchTerm}"</>
+                    {(searchTerm || typeFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all') ? (
+                      <>Showing {filteredData.length} of {financeData.length} records (filtered)</>
                     ) : (
                       <>Showing {filteredData.length} of {financeData.length} records</>
                     )}
                   </div>
-                  {searchTerm && (
+                  {(searchTerm || typeFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all') && (
                     <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      Search Active
+                      Filters Active
                     </Badge>
                   )}
                 </div>

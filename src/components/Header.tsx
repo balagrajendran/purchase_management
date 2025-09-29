@@ -37,6 +37,11 @@ import { HeaderBackground } from './HeaderBackground';
 interface HeaderProps {
   currentPage: string;
   onPageChange: (page: string) => void;
+  user?: {
+    email: string;
+    role: string;
+  } | null;
+  onLogout?: () => void;
 }
 
 const pageNames: Record<string, string> = {
@@ -53,7 +58,7 @@ const quickActions = [
   { id: 'new-invoice', label: 'New Invoice', icon: Plus },
 ];
 
-export function Header({ currentPage, onPageChange }: HeaderProps) {
+export function Header({ currentPage, onPageChange, user, onLogout }: HeaderProps) {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [notifications] = useState([
     { id: 1, title: 'New purchase order approved', time: '2 min ago', unread: true },
@@ -228,7 +233,7 @@ export function Header({ currentPage, onPageChange }: HeaderProps) {
                     <Avatar className="h-8 w-8">
                       <AvatarImage src="/api/placeholder/32/32" alt="User" />
                       <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-                        FS
+                        {user?.email ? user.email.charAt(0).toUpperCase() : 'U'}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
@@ -237,9 +242,9 @@ export function Header({ currentPage, onPageChange }: HeaderProps) {
               <DropdownMenuContent className="w-56 backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border-white/20" align="end">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">FedHub Admin</p>
+                    <p className="text-sm font-medium leading-none">{user?.role || 'User'}</p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      admin@fedhubsoftware.com
+                      {user?.email || 'user@fedhubsoftware.com'}
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -259,7 +264,10 @@ export function Header({ currentPage, onPageChange }: HeaderProps) {
                   <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="hover:bg-white/50 dark:hover:bg-gray-800/50">
+                <DropdownMenuItem 
+                  onClick={onLogout}
+                  className="hover:bg-white/50 dark:hover:bg-gray-800/50 text-red-600 dark:text-red-400"
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
