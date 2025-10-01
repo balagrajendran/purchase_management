@@ -995,7 +995,7 @@ export function ClientManagement() {
                             <Checkbox
                               id="sameAsBilling"
                               checked={sameAsBilling}
-                              onCheckedChange={(checked) => {
+                              onCheckedChange={(checked: any) => {
                                 setSameAsBilling(checked as boolean);
                                 if (checked) {
                                   copyShippingFromBilling();

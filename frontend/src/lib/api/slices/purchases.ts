@@ -1,5 +1,5 @@
 import { api } from '../api';
-import type { Purchase, Paginated } from '../types';
+import type { Purchase, Paginated } from '../../../types';
 
 export const purchasesApi = api.injectEndpoints({
   endpoints: (builder) => ({
