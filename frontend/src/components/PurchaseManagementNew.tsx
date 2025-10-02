@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import { mockPurchases, mockClients } from '../data/mockData';
 
-export function PurchaseManagement() {
+export function PurchaseManagementNew() {
   const [currentView, setCurrentView] = useState<'list' | 'add' | 'edit' | 'view'>('list');
   const [purchases, setPurchases] = useState<Purchase[]>(mockPurchases);
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);

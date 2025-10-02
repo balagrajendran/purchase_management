@@ -810,7 +810,7 @@ export function PurchaseManagement() {
                       <span>Client</span>
                       <span className="text-red-500">*</span>
                     </Label>
-                    <Select value={formData.clientId} onValueChange={(value) => setFormData({ ...formData, clientId: value })}>
+                    <Select value={formData.clientId} onValueChange={(value: any) => setFormData({ ...formData, clientId: value })}>
                       <SelectTrigger className="bg-white/70 dark:bg-gray-800/70 border-blue-200 dark:border-blue-700 focus:border-blue-500">
                         <SelectValue placeholder="Select client" />
                       </SelectTrigger>
@@ -1001,7 +1001,7 @@ Standing Desk,FlexiDesk Height Adjustable,5,599.99,pcs"
                           <span>UOM</span>
                           <span className="text-red-500">*</span>
                         </Label>
-                        <Select value={newItem.uom} onValueChange={(value) => updateNewItem('uom', value)}>
+                        <Select value={newItem.uom} onValueChange={(value: any) => updateNewItem('uom', value)}>
                           <SelectTrigger className="bg-white/70 dark:bg-gray-800/70 border-blue-200 dark:border-blue-700 focus:border-blue-500">
                             <SelectValue placeholder="Select UOM" />
                           </SelectTrigger>
@@ -1024,7 +1024,7 @@ Standing Desk,FlexiDesk Height Adjustable,5,599.99,pcs"
                           <span>Currency</span>
                           <span className="text-red-500">*</span>
                         </Label>
-                        <Select value={newItem.currency} onValueChange={(value) => updateNewItem('currency', value)}>
+                        <Select value={newItem.currency} onValueChange={(value: any) => updateNewItem('currency', value)}>
                           <SelectTrigger className="bg-white/70 dark:bg-gray-800/70 border-blue-200 dark:border-blue-700 focus:border-blue-500">
                             <SelectValue placeholder="Select Currency" />
                           </SelectTrigger>

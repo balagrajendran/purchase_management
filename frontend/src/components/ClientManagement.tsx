@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -10,47 +10,60 @@ import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { 
-  Plus, 
-  Edit, 
-  Mail, 
-  Phone, 
-  Building, 
-  MapPin, 
-  CreditCard, 
-  FileText, 
-  Copy, 
+import {
+  Plus,
+  Edit,
+  Mail,
+  Phone,
+  Building,
+  MapPin,
+  CreditCard,
+  FileText,
+  Copy,
   ArrowLeft,
   Users,
   Save,
   X,
-  CheckCircle,
   Search,
   Filter,
   Trash2,
-  MoreVertical,
   SortAsc,
   SortDesc
 } from 'lucide-react';
-import { mockClients } from '../data/mockData';
-import { Client } from '../types';
+// 🔗 RTK Query hooks (from the provided integration)
+import {
+  useListClientsQuery,
+  useCreateClientMutation,
+  useUpdateClientMutation,
+  useDeleteClientMutation,
+} from '../lib/api/slices/clients';
+import type { Client } from '../types';
 import { Breadcrumb } from './Breadcrumb';
-import { toast } from 'sonner@2.0.3';
+// If your project already imports from 'sonner', keep that:
+import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'motion/react';
 
 export function ClientManagement() {
-  const [clients, setClients] = useState<Client[]>(mockClients);
+  // 🔗 Fetch from backend (pagination optional; using a generous limit to keep your current UI flow)
+  const { data, isFetching, refetch } = useListClientsQuery({ limit: 500 });
+  const serverClients: Client[] = data?.items ?? [];
+
+  // 🔗 Mutations
+  const [createClient, { isLoading: isCreating }] = useCreateClientMutation();
+  const [updateClient, { isLoading: isUpdating }] = useUpdateClientMutation();
+  const [deleteClient, { isLoading: isDeleting }] = useDeleteClientMutation();
+
   const [currentView, setCurrentView] = useState<'list' | 'add' | 'edit'>('list');
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [sameAsBilling, setSameAsBilling] = useState(true);
-  
+
   // Filter and search states
   const [searchTerm, setSearchTerm] = useState('');
   const [stateFilter, setStateFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'company' | 'createdAt' | 'city'>('company');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-  
+
   const [formData, setFormData] = useState({
     // Basic Information
     company: '',
@@ -58,37 +71,37 @@ export function ClientManagement() {
     email: '',
     phone: '',
     status: 'active' as 'active' | 'inactive',
-    
+
     // Business Information
     gstNumber: '',
     msmeNumber: '',
     panNumber: '',
-    
+
     // Billing Address
     billingAddress: {
       street: '',
       city: '',
       state: '',
       postalCode: '',
-      country: 'India'
+      country: 'India',
     },
-    
+
     // Shipping Address
     shippingAddress: {
       street: '',
       city: '',
       state: '',
       postalCode: '',
-      country: 'India'
+      country: 'India',
     },
-    
-    // Banking Information
+
+    // Banking Information (optional)
     bankDetails: {
       bankName: '',
       accountNumber: '',
       ifscCode: '',
-      accountHolderName: ''
-    }
+      accountHolderName: '',
+    },
   });
 
   const resetForm = () => {
@@ -97,7 +110,7 @@ export function ClientManagement() {
       contactPerson: '',
       email: '',
       phone: '',
-      status: 'active' as 'active' | 'inactive',
+      status: 'active',
       gstNumber: '',
       msmeNumber: '',
       panNumber: '',
@@ -106,30 +119,30 @@ export function ClientManagement() {
         city: '',
         state: '',
         postalCode: '',
-        country: 'India'
+        country: 'India',
       },
       shippingAddress: {
         street: '',
         city: '',
         state: '',
         postalCode: '',
-        country: 'India'
+        country: 'India',
       },
       bankDetails: {
         bankName: '',
         accountNumber: '',
         ifscCode: '',
-        accountHolderName: ''
-      }
+        accountHolderName: '',
+      },
     });
     setSameAsBilling(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const clientData: Client = {
-      id: editingClient?.id || Date.now().toString(),
+
+    // Build payload aligned with backend schema
+    const payload: Omit<Client, 'id' | 'createdAt' | 'updatedAt'> & Partial<Pick<Client, 'createdAt'>> = {
       company: formData.company,
       contactPerson: formData.contactPerson,
       email: formData.email,
@@ -140,27 +153,32 @@ export function ClientManagement() {
       panNumber: formData.panNumber,
       billingAddress: formData.billingAddress,
       shippingAddress: sameAsBilling ? formData.billingAddress : formData.shippingAddress,
-      sameAsShipping: sameAsBilling,
-      bankDetails: formData.bankDetails.bankName ? formData.bankDetails : undefined,
-      // Legacy fields
-      name: formData.contactPerson,
-      address: `${formData.billingAddress.street}, ${formData.billingAddress.city}, ${formData.billingAddress.state} ${formData.billingAddress.postalCode}`,
-      createdAt: editingClient?.createdAt || new Date(),
-    };
+      // optional/extra fields your UI uses (backend can store if allowed)
+      // @ts-ignore - depending on your local Client type, these may exist
+      bankDetails: formData.bankDetails?.bankName ? formData.bankDetails : undefined,
+      // required by backend integration we shipped (defaulting to INR for your India flow)
+      baseCurrency: 'INR',
+      // any notes you want to persist
+      // notes: '',
+    } as any;
 
-    if (editingClient) {
-      setClients(clients.map(client => 
-        client.id === editingClient.id ? clientData : client
-      ));
-      toast.success('Client updated successfully!');
-    } else {
-      setClients([...clients, clientData]);
-      toast.success('Client added successfully!');
+    try {
+      if (editingClient) {
+        await updateClient({ id: editingClient.id, patch: payload }).unwrap();
+        toast.success('Client updated successfully!');
+      } else {
+        await createClient(payload as any).unwrap();
+        toast.success('Client added successfully!');
+      }
+      setCurrentView('list');
+      resetForm();
+      setEditingClient(null);
+      // Ensure the list reflects the change quickly
+      refetch();
+    } catch (err: any) {
+      const msg = err?.data?.error || err?.error || 'Failed to save client';
+      toast.error(String(msg));
     }
-    
-    setCurrentView('list');
-    resetForm();
-    setEditingClient(null);
   };
 
   const handleEdit = (client: Client) => {
@@ -170,26 +188,32 @@ export function ClientManagement() {
       contactPerson: client.contactPerson,
       email: client.email,
       phone: client.phone,
-      status: client.status || 'active',
+      status: (client.status as 'active' | 'inactive') || 'active',
       gstNumber: client.gstNumber || '',
       msmeNumber: client.msmeNumber || '',
       panNumber: client.panNumber || '',
       billingAddress: client.billingAddress,
-      shippingAddress: client.shippingAddress || client.billingAddress,
-      bankDetails: client.bankDetails || {
+      shippingAddress: (client as any).shippingAddress || client.billingAddress,
+      bankDetails: (client as any).bankDetails || {
         bankName: '',
         accountNumber: '',
         ifscCode: '',
-        accountHolderName: ''
-      }
+        accountHolderName: '',
+      },
     });
-    setSameAsBilling(client.sameAsShipping || false);
+    setSameAsBilling(((client as any).sameAsShipping as boolean) || false);
     setCurrentView('edit');
   };
 
-  const handleDelete = (clientId: string) => {
-    setClients(clients.filter(client => client.id !== clientId));
-    toast.success('Client deleted successfully!');
+  const handleDelete = async (clientId: string) => {
+    try {
+      await deleteClient(clientId).unwrap();
+      toast.success('Client deleted successfully!');
+      refetch();
+    } catch (err: any) {
+      const msg = err?.data?.error || err?.error || 'Failed to delete client';
+      toast.error(String(msg));
+    }
   };
 
   const handleAddNew = () => {
@@ -206,16 +230,16 @@ export function ClientManagement() {
 
   const copyShippingFromBilling = () => {
     if (sameAsBilling) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
-        shippingAddress: { ...prev.billingAddress }
+        shippingAddress: { ...prev.billingAddress },
       }));
     }
   };
 
   const getBreadcrumbItems = () => {
     const items = [{ label: 'Home', onClick: () => {} }];
-    
+
     if (currentView === 'add') {
       items.push({ label: 'Client Management', onClick: () => setCurrentView('list') });
       return { items, currentPage: 'Add Client' };
@@ -223,41 +247,45 @@ export function ClientManagement() {
       items.push({ label: 'Client Management', onClick: () => setCurrentView('list') });
       return { items, currentPage: 'Edit Client' };
     }
-    
+
     return { items, currentPage: 'Client Management' };
   };
 
   const { items: breadcrumbItems, currentPage } = getBreadcrumbItems();
 
-  // Filtered and sorted clients
+  // 🔎 Filtering + sorting stays client-side (no UI change)
+  const clients = serverClients; // keep name used below
   const filteredAndSortedClients = useMemo(() => {
-    let filtered = clients.filter(client => {
-      const matchesSearch = 
+    let filtered = clients.filter((client) => {
+      const matchesSearch =
         client.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.contactPerson.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.phone.includes(searchTerm);
-      
+
       const matchesState = stateFilter === 'all' || client.billingAddress.state === stateFilter;
-      const matchesStatus = statusFilter === 'all' || client.status === statusFilter;
-      
+      const matchesStatus = statusFilter === 'all' || (client.status as any) === statusFilter;
+
       return matchesSearch && matchesState && matchesStatus;
     });
 
-    // Sort the filtered results
     filtered.sort((a, b) => {
       let aValue: string | Date;
       let bValue: string | Date;
-      
+
       switch (sortBy) {
         case 'company':
           aValue = a.company;
           bValue = b.company;
           break;
-        case 'createdAt':
-          aValue = a.createdAt;
-          bValue = b.createdAt;
+        case 'createdAt': {
+          // handle string ISO vs Date
+          const aC = (a as any).createdAt;
+          const bC = (b as any).createdAt;
+          aValue = typeof aC === 'string' ? aC : (aC as Date);
+          bValue = typeof bC === 'string' ? bC : (bC as Date);
           break;
+        }
         case 'city':
           aValue = a.billingAddress.city;
           bValue = b.billingAddress.city;
@@ -267,7 +295,9 @@ export function ClientManagement() {
           bValue = b.company;
       }
 
+      // @ts-ignore - rely on JS < > for string/date
       if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      // @ts-ignore
       if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
@@ -275,23 +305,22 @@ export function ClientManagement() {
     return filtered;
   }, [clients, searchTerm, stateFilter, statusFilter, sortBy, sortOrder]);
 
-  // Get unique states for filter dropdown
   const uniqueStates = useMemo(() => {
-    const states = [...new Set(clients.map(client => client.billingAddress.state))];
-    return states.filter(state => state).sort();
+    const states = [...new Set(clients.map((client) => client.billingAddress.state))];
+    return states.filter((s) => s).sort();
   }, [clients]);
 
-  // List View
+  // List View (unchanged UI)
   if (currentView === 'list') {
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
         className="space-y-6"
       >
         <Breadcrumb items={breadcrumbItems} currentPage={currentPage} />
-        
+
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="p-2 rounded-lg bg-gradient-to-r from-blue-500/20 to-purple-500/20">
@@ -303,11 +332,12 @@ export function ClientManagement() {
               </h1>
             </div>
           </div>
-          
+
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            <Button 
+            <Button
               onClick={handleAddNew}
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg"
+              disabled={isFetching}
             >
               <Plus className="w-4 h-4 mr-2" />
               Add New Client
@@ -316,7 +346,7 @@ export function ClientManagement() {
         </div>
 
         {/* Filters and Search */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-900/50 dark:to-blue-900/50 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl p-6 space-y-4"
@@ -327,7 +357,7 @@ export function ClientManagement() {
             </div>
             <h3 className="font-medium">Search & Filter Clients</h3>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {/* Search Input */}
             <div className="space-y-2">
@@ -353,7 +383,7 @@ export function ClientManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All States</SelectItem>
-                  {uniqueStates.map(state => (
+                  {uniqueStates.map((state) => (
                     <SelectItem key={state} value={state}>{state}</SelectItem>
                   ))}
                 </SelectContent>
@@ -414,7 +444,6 @@ export function ClientManagement() {
             </div>
           </div>
 
-          {/* Clear Filters */}
           {(searchTerm || stateFilter !== 'all' || statusFilter !== 'all') && (
             <div className="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
               <Button
@@ -435,7 +464,7 @@ export function ClientManagement() {
         </motion.div>
 
         {/* Client Details Summary */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.15 }}
@@ -462,35 +491,30 @@ export function ClientManagement() {
         </motion.div>
 
         {/* Clients List */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
           className="bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden"
         >
           {filteredAndSortedClients.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-16 px-8"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 px-8">
               <div className="p-4 rounded-full bg-gray-100 dark:bg-gray-800 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
                 <Users className="w-8 h-8 text-muted-foreground" />
               </div>
               <p className="text-muted-foreground mb-2">
-                {searchTerm || stateFilter !== 'all' ? 'No clients match your filters' : 'No clients found'}
+                {searchTerm || stateFilter !== 'all' ? 'No clients match your filters' : (isFetching ? 'Loading clients…' : 'No clients found')}
               </p>
               <p className="text-sm text-muted-foreground">
-                {searchTerm || stateFilter !== 'all' 
+                {searchTerm || stateFilter !== 'all'
                   ? 'Try adjusting your search or filter criteria'
-                  : 'Add your first client to get started'
-                }
+                  : 'Add your first client to get started'}
               </p>
             </motion.div>
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50">
+                <TableRow className="border-gray-2 00 dark:border-gray-700 bg-gradient-to-r from-gray-50/50 to-blue-50/50 dark:from-gray-800/50 dark:to-blue-900/50">
                   <TableHead className="font-medium">Company</TableHead>
                   <TableHead className="font-medium">Contact Person</TableHead>
                   <TableHead className="font-medium">Email</TableHead>
@@ -523,9 +547,7 @@ export function ClientManagement() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <p className="text-sm">{client.contactPerson}</p>
-                      </TableCell>
+                      <TableCell><p className="text-sm">{client.contactPerson}</p></TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2 group/email">
                           <Mail className="w-4 h-4 text-muted-foreground group-hover/email:text-blue-600 transition-colors" />
@@ -551,39 +573,39 @@ export function ClientManagement() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge 
-                          variant={client.status === 'active' ? 'default' : 'secondary'}
-                          className={client.status === 'active' 
-                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-sm' 
-                            : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white border-0 shadow-sm'
-                          }
+                        <Badge
+                          variant={(client.status as any) === 'active' ? 'default' : 'secondary'}
+                          className={(client.status as any) === 'active'
+                            ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-sm'
+                            : 'bg-gradient-to-r from-gray-400 to-gray-500 text-white border-0 shadow-sm'}
                         >
-                          {client.status === 'active' ? 'Active' : 'Inactive'}
+                          {(client.status as any) === 'active' ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
-
                       <TableCell>
                         <div className="flex items-center justify-center space-x-1">
                           <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                            <Button 
-                              variant="ghost" 
+                            <Button
+                              variant="ghost"
                               size="sm"
                               onClick={() => handleEdit(client)}
                               className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20"
                               title="Edit Client"
+                              disabled={isFetching || isUpdating}
                             >
                               <Edit className="w-4 h-4 text-blue-600" />
                             </Button>
                           </motion.div>
-                          
+
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                                <Button 
-                                  variant="ghost" 
+                                <Button
+                                  variant="ghost"
                                   size="sm"
                                   className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900/20"
                                   title="Delete Client"
+                                  disabled={isDeleting}
                                 >
                                   <Trash2 className="w-4 h-4 text-red-600" />
                                 </Button>
@@ -593,8 +615,7 @@ export function ClientManagement() {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete Client</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Are you sure you want to delete <strong>{client.company}</strong>? 
-                                  This action cannot be undone and will permanently remove all client data.
+                                  Are you sure you want to delete <strong>{client.company}</strong>? This action cannot be undone and will permanently remove all client data.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -621,7 +642,7 @@ export function ClientManagement() {
     );
   }
 
-  // Add/Edit Form View
+  // Add/Edit Form View (UI unchanged)
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -630,13 +651,13 @@ export function ClientManagement() {
       className="space-y-6"
     >
       <Breadcrumb items={breadcrumbItems} currentPage={currentPage} />
-      
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleCancel}
               className="flex items-center space-x-2"
             >
@@ -644,7 +665,7 @@ export function ClientManagement() {
               <span>Back to Clients</span>
             </Button>
           </motion.div>
-          
+
           <div className="flex items-center space-x-3">
             <div className="p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20">
               {editingClient ? <Edit className="w-6 h-6 text-blue-600" /> : <Plus className="w-6 h-6 text-blue-600" />}
@@ -662,14 +683,11 @@ export function ClientManagement() {
       </div>
 
       {/* Form Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         <Card className="border-0 shadow-xl bg-gradient-to-br from-white to-gray-50/50 dark:from-gray-900 dark:to-gray-800/50 backdrop-blur-sm">
           <CardContent className="p-8">
             <form onSubmit={handleSubmit}>
+              
               <Tabs defaultValue="basic" className="w-full">
                 <TabsList className="grid w-full grid-cols-4 mb-8 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
                   <TabsTrigger value="basic" className="flex items-center space-x-2">
@@ -1184,18 +1202,18 @@ export function ClientManagement() {
                   </motion.div>
                 </TabsContent>
               </Tabs>
-              
+
               {/* Action Buttons */}
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
                 className="flex justify-end space-x-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700"
               >
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={handleCancel}
                     className="flex items-center space-x-2"
                   >
@@ -1204,9 +1222,10 @@ export function ClientManagement() {
                   </Button>
                 </motion.div>
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                  <Button 
+                  <Button
                     type="submit"
                     className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg flex items-center space-x-2"
+                    disabled={isCreating || isUpdating}
                   >
                     <Save className="w-4 h-4" />
                     <span>{editingClient ? 'Update Client' : 'Add Client'}</span>
