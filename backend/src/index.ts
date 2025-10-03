@@ -1,14 +1,20 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { json as bodyParserJson } from 'express';
 import { healthRouter } from './routes/health.js';
 import { clientsRouter } from './routes/clients.js';
-import { purchasesRouter } from './routes/purchases.js';
-import { invoicesRouter } from './routes/invoices.js';
+import purchasesRouter from "./routes/purchases.js";
+import invoicesRouter  from './routes/invoices.js';
 import { initFirestore } from './lib/firestore.js';
 
-dotenv.config();
+
+console.log('ENV PID', process.env.GCP_PROJECT_ID, process.env.FIRESTORE_DB_ID);
+
+await initFirestore();
+// … start server
+
+
 
 // Initialize Firestore (throws if misconfigured)
 await initFirestore();
@@ -46,3 +52,4 @@ const port = process.env.PORT || 8080;
 app.listen(port, () => {
   console.log(`API listening on :${port}`);
 });
+

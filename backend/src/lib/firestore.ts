@@ -1,72 +1,92 @@
 // src/lib/firestore.ts
+import 'dotenv/config';
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 import { existsSync, readFileSync } from 'fs';
 
 let initialized = false;
-// Keep a singleton Firestore instance
-let _db: FirebaseFirestore.Firestore;
+let _db: FirebaseFirestore.Firestore | undefined;
+
+function resolveProjectId(fromSa?: any): string | undefined {
+  return (
+    process.env.FIREBASE_PROJECT_ID ||
+    process.env.GCP_PROJECT_ID ||
+    process.env.GOOGLE_CLOUD_PROJECT ||
+    process.env.GCLOUD_PROJECT ||
+    fromSa?.project_id
+  );
+}
 
 export async function initFirestore() {
   if (initialized && _db) return;
 
-  const projectId = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT;
-  if (!projectId) {
-    throw new Error('GCP_PROJECT_ID or GOOGLE_CLOUD_PROJECT must be set');
-  }
-
-  const databaseId = process.env.FIRESTORE_DB_ID || '(default)'; // e.g. "(default)" or "purchase-management-db"
+  const databaseId = process.env.FIRESTORE_DB_ID || '(default)';
 
   if (!admin.apps.length) {
-    // Choose one of:
-    // 1) GOOGLE_APPLICATION_CREDENTIALS=<path-to-json>
-    // 2) SERVICE_ACCOUNT_JSON=<inline JSON string> or <path to JSON>
     const saPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
     const saJsonOrPath = process.env.SERVICE_ACCOUNT_JSON;
 
+    let creds: Record<string, unknown> | undefined;
+    let projectId: string | undefined;
+
     if (saJsonOrPath) {
-      let creds: Record<string, unknown>;
       if (saJsonOrPath.trim().startsWith('{')) {
         creds = JSON.parse(saJsonOrPath);
       } else if (existsSync(saJsonOrPath)) {
         creds = JSON.parse(readFileSync(saJsonOrPath, 'utf8'));
       } else {
-        throw new Error('SERVICE_ACCOUNT_JSON must be a JSON string or a valid path to a JSON file');
+        throw new Error(
+          'SERVICE_ACCOUNT_JSON must be a JSON string or a valid path to a JSON file'
+        );
       }
+
+      projectId = resolveProjectId(creds);
+
       admin.initializeApp({
         credential: admin.credential.cert(creds as admin.ServiceAccount),
         projectId,
       });
+      console.log(`[firestore] using SERVICE_ACCOUNT_JSON. projectId=${projectId}`);
     } else if (saPath && existsSync(saPath)) {
+      projectId = resolveProjectId();
       admin.initializeApp({
         credential: admin.credential.applicationDefault(),
         projectId,
       });
+      console.log(`[firestore] using GOOGLE_APPLICATION_CREDENTIALS. projectId=${projectId}`);
     } else {
+      projectId = resolveProjectId();
       admin.initializeApp({
         credential: admin.credential.applicationDefault(),
         projectId,
       });
+      console.log(`[firestore] using ADC. projectId=${projectId}`);
     }
   }
 
-  // 👉 IMPORTANT: bind to the named database (or "(default)")
-  _db = getFirestore(admin.app(), databaseId);
-  // @ts-expect-error admin typings
+  _db = getFirestore(admin.app(), (process.env.FIRESTORE_DB_ID || '(default)') as any);
+  // @ts-expect-error option exists at runtime
   _db.settings({ ignoreUndefinedProperties: true });
 
+  const effectiveProjectId =
+    admin.app().options.projectId || resolveProjectId() || '(unknown)';
   console.log(
-    'Firestore initialized for project:',
-    projectId,
-    ' DB:',
-    databaseId,
-    '\nResource:',
-    `projects/${projectId}/databases/${databaseId}`
+    `[firestore] initialized project=${effectiveProjectId} db=${process.env.FIRESTORE_DB_ID || '(default)'}`
   );
 
   initialized = true;
 }
 
+/**
+ * Lazily return a Firestore instance. Safe to use anywhere.
+ * Always `await getDb()` in routes/handlers instead of calling `db()`.
+ */
+export async function getDb(): Promise<FirebaseFirestore.Firestore> {
+  if (!_db) await initFirestore();
+  return _db!;
+}
+
+/** Synchronous accessor (deprecated). Only safe *after* initFirestore() was awaited. */
 export const db = () => {
   if (!_db) throw new Error('Firestore not initialized. Call initFirestore() first.');
   return _db;

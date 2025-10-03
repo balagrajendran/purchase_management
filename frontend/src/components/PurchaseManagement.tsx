@@ -37,7 +37,6 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  AlertCircle,
   Upload,
   FileSpreadsheet,
   Download,
@@ -46,13 +45,27 @@ import {
   SortAsc,
   SortDesc
 } from 'lucide-react';
-import { mockPurchases, mockClients } from '../data/mockData';
+
+// 🔗 RTK Query hooks (backend)
+import {
+  useListPurchasesQuery,
+  useCreatePurchaseMutation,
+  useUpdatePurchaseMutation,
+  useDeletePurchaseMutation,
+} from '../lib/api/slices/purchases';
+import { useListClientsQuery } from '../lib/api/slices/clients';
 
 export function PurchaseManagement() {
   const [currentView, setCurrentView] = useState<'list' | 'add' | 'edit' | 'view'>('list');
-  const [purchases, setPurchases] = useState<Purchase[]>(mockPurchases);
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [viewPurchase, setViewPurchase] = useState<Purchase | null>(null);
+  
+  // 🔗 Load from backend
+  const { data: purchaseData, isFetching, refetch } = useListPurchasesQuery({ limit: 500 });
+  const purchases: Purchase[] = purchaseData?.items ?? [];
+
+  const { data: clientData } = useListClientsQuery({ limit: 500 });
+  const clients: Client[] = clientData?.items ?? [];
   
   // Filter and search states
   const [searchTerm, setSearchTerm] = useState('');
@@ -61,6 +74,11 @@ export function PurchaseManagement() {
   const [sortBy, setSortBy] = useState<'poNumber' | 'createdAt' | 'total'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   
+  // Mutations
+  const [createPurchase, { isLoading: isCreating }] = useCreatePurchaseMutation();
+  const [updatePurchase, { isLoading: isUpdating }] = useUpdatePurchaseMutation();
+  const [deletePurchase, { isLoading: isDeleting }] = useDeletePurchaseMutation();
+
   // Form data
   const [formData, setFormData] = useState({
     clientId: '',
@@ -106,19 +124,22 @@ export function PurchaseManagement() {
   // Generate PO Number
   const generatePONumber = () => {
     const year = new Date().getFullYear();
-    const existingPOs = purchases.filter(p => p.poNumber?.startsWith(`PO-${year}`));
+    const existingPOs = purchases.filter(p => typeof p.poNumber === 'string' && p.poNumber?.startsWith(`PO-${year}`));
     const nextNumber = existingPOs.length + 1;
     return `PO-${year}-${nextNumber.toString().padStart(3, '0')}`;
   };
 
+  // Client map for quick lookup
+  const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c])), [clients]);
+
   // Filtered and sorted purchases
   const filteredAndSortedPurchases = useMemo(() => {
     let filtered = purchases.filter(purchase => {
-      const client = mockClients.find(c => c.id === purchase.clientId);
+      const client = clientMap.get(purchase.clientId);
       const matchesSearch = 
         purchase.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client?.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        purchase.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+        (client?.company || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (purchase.notes || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || purchase.status === statusFilter;
       const matchesClient = clientFilter === 'all' || purchase.clientId === clientFilter;
@@ -137,25 +158,27 @@ export function PurchaseManagement() {
           bValue = b.poNumber;
           break;
         case 'createdAt':
-          aValue = a.createdAt;
-          bValue = b.createdAt;
+          aValue = a.createdAt as any;
+          bValue = b.createdAt as any;
           break;
         case 'total':
           aValue = a.total;
           bValue = b.total;
           break;
         default:
-          aValue = a.createdAt;
-          bValue = b.createdAt;
+          aValue = a.createdAt as any;
+          bValue = b.createdAt as any;
       }
 
+      // @ts-ignore - comparing mixed types ok for sorting here
       if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
+      // @ts-ignore
       if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
       return 0;
     });
 
     return filtered;
-  }, [purchases, searchTerm, statusFilter, clientFilter, sortBy, sortOrder]);
+  }, [purchases, clientMap, searchTerm, statusFilter, clientFilter, sortBy, sortOrder]);
 
   const resetForm = () => {
     setFormData({ clientId: '', status: 'pending', notes: '' });
@@ -172,7 +195,7 @@ export function PurchaseManagement() {
     setEditingPurchase(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (items.length === 0) {
@@ -190,31 +213,40 @@ export function PurchaseManagement() {
     const tax = calculateTax(subtotal);
     const total = subtotal + tax;
 
-    if (editingPurchase) {
-      setPurchases(purchases.map(purchase => 
-        purchase.id === editingPurchase.id 
-          ? { ...purchase, ...formData, items: purchaseItems, subtotal, tax, total, baseCurrency: DEFAULT_CURRENCY }
-          : purchase
-      ));
-      toast.success('Purchase updated successfully!');
-    } else {
-      const newPurchase: Purchase = {
-        id: Date.now().toString(),
-        poNumber: generatePONumber(),
-        ...formData,
-        items: purchaseItems,
-        subtotal,
-        tax,
-        total,
-        baseCurrency: DEFAULT_CURRENCY,
-        createdAt: new Date(),
-      };
-      setPurchases([...purchases, newPurchase]);
-      toast.success('Purchase created successfully!');
-    }
+    try {
+      if (editingPurchase) {
+        await updatePurchase({
+          id: editingPurchase.id,
+          patch: {
+            ...formData,
+            items: purchaseItems,
+            subtotal,
+            tax,
+            total,
+            baseCurrency: DEFAULT_CURRENCY,
+          },
+        }).unwrap();
+        toast.success('Purchase updated successfully!');
+      } else {
+        await createPurchase({
+          poNumber: generatePONumber(),
+          ...formData,
+          items: purchaseItems,
+          subtotal,
+          tax,
+          total,
+          baseCurrency: DEFAULT_CURRENCY,
+        } as any).unwrap();
+        toast.success('Purchase created successfully!');
+      }
 
-    setCurrentView('list');
-    resetForm();
+      setCurrentView('list');
+      resetForm();
+      await refetch();
+    } catch (err: any) {
+      const msg = err?.data?.error || err?.error || 'Failed to save purchase';
+      toast.error(String(msg));
+    }
   };
 
   const handleEdit = (purchase: Purchase) => {
@@ -241,9 +273,19 @@ export function PurchaseManagement() {
     setCurrentView('view');
   };
 
-  const handleDelete = (id: string) => {
-    setPurchases(purchases.filter(p => p.id !== id));
-    toast.success('Purchase deleted successfully!');
+  const handleDelete = async (id: string) => {
+    try {
+      await deletePurchase(id).unwrap();
+      toast.success('Purchase deleted successfully!');
+      await refetch();
+      if (currentView === 'view' && viewPurchase?.id === id) {
+        setCurrentView('list');
+        setViewPurchase(null);
+      }
+    } catch (err: any) {
+      const msg = err?.data?.error || err?.error || 'Failed to delete purchase';
+      toast.error(String(msg));
+    }
   };
 
   const handleAddNew = () => {
@@ -469,7 +511,7 @@ export function PurchaseManagement() {
             </p>
           </div>
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            <Button onClick={handleAddNew} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+            <Button onClick={handleAddNew} className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" disabled={isFetching}>
               <Plus className="w-4 h-4 mr-2" />
               Add Purchase
             </Button>
@@ -551,7 +593,7 @@ export function PurchaseManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Clients</SelectItem>
-                  {mockClients.map(client => (
+                  {clients.map(client => (
                     <SelectItem key={client.id} value={client.id}>{client.company}</SelectItem>
                   ))}
                 </SelectContent>
@@ -647,7 +689,7 @@ export function PurchaseManagement() {
               <div className="text-center py-12">
                 <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
-                  {purchases.length === 0 ? 'No purchases yet' : 'No purchases match your filters'}
+                  {purchases.length === 0 ? (isFetching ? 'Loading purchases…' : 'No purchases yet') : 'No purchases match your filters'}
                 </h3>
                 <p className="text-gray-500 mb-4">
                   {purchases.length === 0 
@@ -655,7 +697,7 @@ export function PurchaseManagement() {
                     : 'Try adjusting your search or filter criteria'
                   }
                 </p>
-                {purchases.length === 0 && (
+                {purchases.length === 0 && !isFetching && (
                   <Button onClick={handleAddNew}>
                     <Plus className="w-4 h-4 mr-2" />
                     Add First Purchase
@@ -679,7 +721,7 @@ export function PurchaseManagement() {
                   <TableBody>
                     <AnimatePresence>
                       {filteredAndSortedPurchases.map((purchase, index) => {
-                        const client = mockClients.find(c => c.id === purchase.clientId);
+                        const client = clientMap.get(purchase.clientId);
                         return (
                           <motion.tr
                             key={purchase.id}
@@ -715,7 +757,7 @@ export function PurchaseManagement() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-muted-foreground">
-                              {purchase.createdAt.toLocaleDateString()}
+                              {new Date(purchase.createdAt as any).toLocaleDateString()}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center justify-center space-x-2">
@@ -733,7 +775,7 @@ export function PurchaseManagement() {
                                 <TooltipProvider>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="sm" onClick={() => handleEdit(purchase)}>
+                                      <Button variant="ghost" size="sm" onClick={() => handleEdit(purchase)} disabled={isUpdating}>
                                         <Edit className="w-4 h-4" />
                                       </Button>
                                     </TooltipTrigger>
@@ -749,6 +791,7 @@ export function PurchaseManagement() {
                                         size="sm" 
                                         onClick={() => handleDelete(purchase.id)}
                                         className="hover:text-red-600"
+                                        disabled={isDeleting}
                                       >
                                         <Trash2 className="w-4 h-4" />
                                       </Button>
@@ -815,7 +858,7 @@ export function PurchaseManagement() {
                         <SelectValue placeholder="Select client" />
                       </SelectTrigger>
                       <SelectContent>
-                        {mockClients.map((client) => (
+                        {clients.map((client) => (
                           <SelectItem key={client.id} value={client.id}>
                             <div className="flex flex-col">
                               <span className="font-medium">{client.company}</span>
@@ -905,9 +948,9 @@ export function PurchaseManagement() {
                             <Label htmlFor="csvData">Paste CSV Data</Label>
                             <Textarea
                               id="csvData"
-                              placeholder="Item Name,Model,Quantity,Unit Price,UOM
+                              placeholder={`Item Name,Model,Quantity,Unit Price,UOM
 Office Chair,ErgoMax Pro 2024,10,299.99,pcs
-Standing Desk,FlexiDesk Height Adjustable,5,599.99,pcs"
+Standing Desk,FlexiDesk Height Adjustable,5,599.99,pcs`}
                               value={bulkImportData}
                               onChange={(e) => setBulkImportData(e.target.value)}
                               className="min-h-[200px] font-mono text-sm"
@@ -1204,7 +1247,7 @@ Standing Desk,FlexiDesk Height Adjustable,5,599.99,pcs"
                   <X className="w-4 h-4 mr-2" />
                   Cancel
                 </Button>
-                <Button type="submit" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+                <Button type="submit" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700" disabled={isCreating || isUpdating}>
                   <Save className="w-4 h-4 mr-2" />
                   {editingPurchase ? 'Update Purchase' : 'Create Purchase'}
                 </Button>
@@ -1218,7 +1261,7 @@ Standing Desk,FlexiDesk Height Adjustable,5,599.99,pcs"
 
   // View mode
   if (currentView === 'view' && viewPurchase) {
-    const client = mockClients.find(c => c.id === viewPurchase.clientId);
+    const client = clientMap.get(viewPurchase.clientId);
     
     return (
       <motion.div
@@ -1280,7 +1323,7 @@ Standing Desk,FlexiDesk Height Adjustable,5,599.99,pcs"
                   <Label className="text-sm font-medium text-muted-foreground">Created Date</Label>
                   <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span>{viewPurchase.createdAt.toLocaleDateString('en-IN', { 
+                    <span>{(viewPurchase.createdAt as any as Date).toLocaleDateString('en-IN', { 
                       weekday: 'long',
                       year: 'numeric',
                       month: 'long',
@@ -1457,7 +1500,7 @@ Standing Desk,FlexiDesk Height Adjustable,5,599.99,pcs"
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Created</Label>
                       <p className="text-sm text-muted-foreground">
-                        {viewPurchase.createdAt.toLocaleString('en-IN', {
+                        {(viewPurchase.createdAt as any as Date).toLocaleString('en-IN', {
                           weekday: 'short',
                           year: 'numeric',
                           month: 'short',
@@ -1476,6 +1519,7 @@ Standing Desk,FlexiDesk Height Adjustable,5,599.99,pcs"
                   </div>
                 </div>
               </div>
+
             </div>
 
             {/* Notes Section */}

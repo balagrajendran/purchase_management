@@ -1,6 +1,6 @@
 // src/lib/api/client.ts
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { Client } from '../../types';
+import type { Client } from '../../../types';
 
 export interface Paginated<T> {
   items: T[];

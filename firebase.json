@@ -1,0 +1,7 @@
+{
+  "firestore": {
+    "database": "purchase-management-db",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 👇 pick one of these for dev:
+
+    // (a) if you're using Firebase Auth in the app:
+    function isSignedIn() { return request.auth != null; }
+
+    // (b) TEMPORARY wide-open (NOT for production!):
+    // function isSignedIn() { return true; }
+
+    // Purchases
+    match /purchases/{docId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // Invoices
+    match /invoices/{docId} {
+      allow read, create, update, delete: if isSignedIn();
+    }
+
+    // Clients (read-only to app, adjust as needed)
+    match /clients/{docId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
