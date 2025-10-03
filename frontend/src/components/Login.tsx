@@ -19,7 +19,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { AnimatedBackground } from './AnimatedBackground';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface LoginProps {
   onLogin: (credentials: { email: string; password: string; rememberMe: boolean }) => void;
@@ -262,7 +262,7 @@ export function Login({ onLogin }: LoginProps) {
                     <Checkbox
                       id="remember"
                       checked={rememberMe}
-                      onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                      onCheckedChange={(checked: any) => setRememberMe(checked as boolean)}
                       disabled={isLoading}
                     />
                     <Label htmlFor="remember" className="text-sm cursor-pointer">

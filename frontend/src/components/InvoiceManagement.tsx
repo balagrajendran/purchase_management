@@ -246,43 +246,46 @@ export function InvoiceManagement() {
     }
   }, [formData.clientId, availablePurchases, clients]);
 
-// helper to keep updates no-op when nothing changed
-const arraysEqual = (a: string[], b: string[]) =>
-  a.length === b.length && a.every((v, i) => v === b[i]);
+  // replace arraysEqual with an order-insensitive version
+  const arraysEqual = (a: string[], b: string[]) => {
+    if (a.length !== b.length) return false;
+    const as = [...a].sort();
+    const bs = [...b].sort();
+    return as.every((v, i) => v === bs[i]);
+  };
 
-const handlePurchaseOrderSelection = useCallback(
-  (purchaseIds: string[]) => {
-    // normalize + stable order so comparisons are reliable
-    const next = Array.from(new Set(purchaseIds)).sort();
+  const handlePurchaseOrderSelection = useCallback(
+    (purchaseIds: string[]) => {
+      // normalize + stable order so comparisons are reliable
+      const next = Array.from(new Set(purchaseIds)).sort();
 
-    setSelectedPurchases((prev) => {
-      if (arraysEqual(prev, next)) return prev; // no change → no re-render loops
+      setSelectedPurchases((prev) => {
+        if (arraysEqual(prev, next)) return prev; // no change → no re-render loops
 
-      // Build items only when the selection actually changed
-      const byId = new Map<string, Purchase>();
-      availablePurchases.forEach((p) => byId.set(p.id, p));
+        // Build items only when the selection actually changed
+        const byId = new Map<string, Purchase>();
+        availablePurchases.forEach((p) => byId.set(p.id, p));
 
-      const allItems: (PurchaseItem & {
-        purchaseId: string;
-        poNumber: string;
-      })[] = [];
+        const allItems: (PurchaseItem & {
+          purchaseId: string;
+          poNumber: string;
+        })[] = [];
 
-      next.forEach((pid) => {
-        const p = byId.get(pid);
-        if (p) {
-          p.items.forEach((it) =>
-            allItems.push({ ...it, purchaseId: p.id, poNumber: p.poNumber })
-          );
-        }
+        next.forEach((pid) => {
+          const p = byId.get(pid);
+          if (p) {
+            p.items.forEach((it) =>
+              allItems.push({ ...it, purchaseId: p.id, poNumber: p.poNumber })
+            );
+          }
+        });
+
+        setSelectedItems(allItems);
+        return next;
       });
-
-      setSelectedItems(allItems);
-      return next;
-    });
-  },
-  [availablePurchases]
-);
-
+    },
+    [availablePurchases]
+  );
 
   const handleRemoveItem = (itemIndex: number) => {
     setSelectedItems((prev) => prev.filter((_, index) => index !== itemIndex));
@@ -399,7 +402,7 @@ const handlePurchaseOrderSelection = useCallback(
       setStatusUpdatingId(invoiceId);
       await updateInvoice({
         id: invoiceId,
-        patch: { status: newStatus },
+        data: { status: newStatus },
       }).unwrap();
       const statusMessages: Record<string, string> = {
         sent: "Invoice sent successfully!",
@@ -444,7 +447,7 @@ const handlePurchaseOrderSelection = useCallback(
   const handleDeleteInvoice = async (invoiceId: string) => {
     try {
       const inv = invoices.find((i) => i.id === invoiceId);
-      await deleteInvoice(invoiceId).unwrap();
+      await deleteInvoice({ id: invoiceId }).unwrap();
       toast.success(
         `Invoice ${inv?.invoiceNumber ?? invoiceId} deleted successfully!`
       );
@@ -783,7 +786,9 @@ const handlePurchaseOrderSelection = useCallback(
       pdf.text(ctext, (210 - w2) / 2, y);
 
       pdf.save(`${invoice.invoiceNumber}.pdf`);
-      toast.success(`Invoice ${invoice.invoiceNumber} downloaded successfully!`);
+      toast.success(
+        `Invoice ${invoice.invoiceNumber} downloaded successfully!`
+      );
     } catch (error) {
       console.error("Error generating PDF:", error);
       toast.error("Failed to generate PDF. Please try again.");
@@ -944,8 +949,12 @@ const handlePurchaseOrderSelection = useCallback(
                   <TableHead className="font-semibold">Description</TableHead>
                   <TableHead className="font-semibold">Model</TableHead>
                   <TableHead className="font-semibold">Supplier</TableHead>
-                  <TableHead className="font-semibold text-center">Qty</TableHead>
-                  <TableHead className="font-semibold text-center">UOM</TableHead>
+                  <TableHead className="font-semibold text-center">
+                    Qty
+                  </TableHead>
+                  <TableHead className="font-semibold text-center">
+                    UOM
+                  </TableHead>
                   <TableHead className="font-semibold text-center">
                     Currency
                   </TableHead>
@@ -1644,37 +1653,43 @@ const handlePurchaseOrderSelection = useCallback(
                     ) : (
                       <div className="max-h-64 overflow-y-auto border rounded-lg bg-gray-50 dark:bg-gray-800/50">
                         {availablePurchases.map((purchase) => {
-  const isSelected = selectedPurchases.includes(purchase.id);
-  return (
-    <div
-      key={purchase.id}
-      className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-all duration-200 ${
-        isSelected
-          ? "border-purple-300 bg-purple-50 dark:bg-purple-900/20"
-          : "border-gray-200 dark:border-gray-700 hover:border-purple-200 hover:bg-purple-25"
-      }`}
-    >
-      <Checkbox
-        checked={isSelected}
-        // drive selection *only* from the checkbox
-        onCheckedChange={(checked: boolean) => {
-          const newSelection = checked
-            ? [...selectedPurchases, purchase.id]
-            : selectedPurchases.filter((id) => id !== purchase.id);
-          handlePurchaseOrderSelection(newSelection);
-        }}
-      />
-      <div className="flex-1">
-        <div className="flex items-center space-x-2">
-          <Badge variant="outline" className="font-mono text-xs">
-            {purchase.poNumber}
-          </Badge>
-        </div>
-      </div>
-    </div>
-  );
-})}
+                          const isSelected = selectedPurchases.includes(
+                            purchase.id
+                          );
+                          return (
+                            <div
+                              key={purchase.id}
+                              className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-all duration-200 ${
+                                isSelected
+                                  ? "border-purple-300 bg-purple-50 dark:bg-purple-900/20"
+                                  : "border-gray-200 dark:border-gray-700 hover:border-purple-200 hover:bg-purple-25"
+                              }`}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => {
+                                  const newSelection = isSelected
+                                    ? selectedPurchases.filter(
+                                        (id) => id !== purchase.id
+                                      )
+                                    : [...selectedPurchases, purchase.id];
+                                  handlePurchaseOrderSelection(newSelection);
+                                }}
+                              />
 
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2">
+                                  <Badge
+                                    variant="outline"
+                                    className="font-mono text-xs"
+                                  >
+                                    {purchase.poNumber}
+                                  </Badge>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -2079,7 +2094,10 @@ const handlePurchaseOrderSelection = useCallback(
                   <Download className="w-4 h-4 mr-2" />
                   Download PDF
                 </Button>
-                <Button variant="outline" onClick={() => setCurrentView("list")}>
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentView("list")}
+                >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to List
                 </Button>
@@ -2103,32 +2121,46 @@ const handlePurchaseOrderSelection = useCallback(
         toast.error("Please select at least one item to update the invoice");
         return;
       }
-      if (
-        !formData.clientId ||
-        !formData.dueDate ||
-        selectedPurchases.length === 0
-      ) {
-        toast.error(
-          "Please fill in all required fields including client, due date, and purchase orders"
-        );
+      if (!formData.clientId || !formData.dueDate) {
+        toast.error("Please fill in client and due date");
         return;
       }
 
       const { subtotal, tax, total } = calculateInvoiceTotal();
       try {
+        const purchaseIds =
+          selectedPurchases.length > 0
+            ? selectedPurchases
+            : editInvoice.purchaseIds ??
+              (editInvoice.purchaseId ? [editInvoice.purchaseId] : []);
+
+        const cleanItems = selectedItems.map((it) => ({
+          // include only fields your API accepts
+          id: it.id, // keep if server uses line ids; else omit
+          name: it.name,
+          model: it.model ?? "",
+          supplier: it.supplier ?? "",
+          quantity: Number(it.quantity) || 0,
+          uom: it.uom ?? "",
+          currency: it.currency,
+          unitPrice: Number(it.unitPrice) || 0,
+          total: Number(it.total) || 0,
+        }));
+
+        const { subtotal, tax, total } = calculateInvoiceTotal();
+
         await updateInvoice({
           id: editInvoice.id,
-          patch: {
-            purchaseIds: selectedPurchases,
-            purchaseId: selectedPurchases[0],
+          data: {
             clientId: formData.clientId,
             dueDate: new Date(formData.dueDate).toISOString(),
-            items: selectedItems,
+            items: cleanItems,
             subtotal,
             tax,
             total,
             notes: formData.notes,
             paymentTerms: formData.paymentTerms,
+            ...(purchaseIds.length ? { purchaseIds } : {}), // only send if we have them
           },
         }).unwrap();
 
@@ -2313,24 +2345,22 @@ const handlePurchaseOrderSelection = useCallback(
                         return (
                           <div
                             key={purchase.id}
-                            className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-all duration-200 cursor-pointer ${
+                            className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-all duration-200 ${
                               isSelected
                                 ? "border-purple-300 bg-purple-50 dark:bg-purple-900/20"
                                 : "border-gray-200 dark:border-gray-700 hover:border-purple-200 hover:bg-purple-25"
                             }`}
-                            onClick={() => {
-                              const newSelection = isSelected
-                                ? selectedPurchases.filter(
-                                    (id) => id !== purchase.id
-                                  )
-                                : [...selectedPurchases, purchase.id];
-                              handlePurchaseOrderSelection(newSelection);
-                            }}
                           >
                             <Checkbox
                               checked={isSelected}
-                              onChange={() => {}}
-                              className="pointer-events-none"
+                              onCheckedChange={(checked: boolean) => {
+                                const next = checked
+                                  ? [...selectedPurchases, purchase.id]
+                                  : selectedPurchases.filter(
+                                      (id) => id !== purchase.id
+                                    );
+                                handlePurchaseOrderSelection(next);
+                              }}
                             />
                             <div className="flex-1">
                               <div className="flex items-center space-x-2">
@@ -2376,7 +2406,9 @@ const handlePurchaseOrderSelection = useCallback(
                             <TableHead className="font-semibold">
                               Description
                             </TableHead>
-                            <TableHead className="font-semibold">Model</TableHead>
+                            <TableHead className="font-semibold">
+                              Model
+                            </TableHead>
                             <TableHead className="font-semibold">
                               Supplier
                             </TableHead>
@@ -2676,8 +2708,7 @@ const handlePurchaseOrderSelection = useCallback(
                     updating ||
                     selectedItems.length === 0 ||
                     !formData.clientId ||
-                    !formData.dueDate ||
-                    selectedPurchases.length === 0
+                    !formData.dueDate
                   }
                   className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
                 >

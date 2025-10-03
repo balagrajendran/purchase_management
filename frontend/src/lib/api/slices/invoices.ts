@@ -59,9 +59,15 @@ export type CreateInvoiceRequest = Omit<
   "id" | "createdAt" | "updatedAt" | "invoiceNumber"
 > & { purchaseIds?: string[] };
 
-export type UpdateInvoiceRequest = Partial<
-  Omit<Invoice, "id" | "createdAt" | "updatedAt" | "invoiceNumber">
-> & { purchaseIds?: string[] };
+// export type UpdateInvoiceRequest = Partial<
+//   Omit<Invoice, "id" | "createdAt" | "updatedAt" | "invoiceNumber">
+// > & { purchaseIds?: string[] };
+
+type UpdateInvoiceRequest = Partial<Invoice> & {
+  status?: "draft" | "sent" | "paid" | "overdue";
+  purchaseIds?: string[];
+  items?: any[]; // or your exact item type
+};
 
 export const invoiceApi = createApi({
   reducerPath: "invoiceApi",
