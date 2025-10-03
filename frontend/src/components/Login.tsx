@@ -25,6 +25,18 @@ interface LoginProps {
   onLogin: (credentials: { email: string; password: string; rememberMe: boolean }) => void;
 }
 
+type LoginResponse = {
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    role: 'admin' | 'employee';
+    name: string;
+  };
+};
+
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8080/api';
+
 export function Login({ onLogin }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,51 +45,53 @@ export function Login({ onLogin }: LoginProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
 
-
-
   const validateForm = () => {
     const newErrors: { email?: string; password?: string } = {};
-    
-    if (!email) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-    
-    if (!password) {
-      newErrors.password = 'Password is required';
-    } else if (password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-    
+    if (!email) newErrors.email = 'Email is required';
+    else if (!/\S+@\S+\.\S+/.test(email)) newErrors.email = 'Please enter a valid email address';
+
+    if (!password) newErrors.password = 'Password is required';
+    else if (password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsLoading(true);
     setErrors({});
-
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // For now, accept any valid email format with password length >= 6
-      // In a real application, this would validate against your backend
-      if (email && password.length >= 6) {
-        toast.success('Welcome back! Login successful');
-        onLogin({ email, password, rememberMe });
-      } else {
-        setErrors({ general: 'Invalid email or password. Please check your credentials.' });
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        const msg = text || 'Invalid email or password. Please check your credentials.';
+        setErrors({ general: msg });
         toast.error('Invalid credentials');
+        return;
       }
-    } catch (error) {
+
+      const data: LoginResponse = await res.json();
+
+      // Persist session
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem('authToken', data.token);
+      storage.setItem('authUser', JSON.stringify(data.user));
+      // Clear the other storage to avoid confusion when toggling remember me
+      const other = rememberMe ? sessionStorage : localStorage;
+      other.removeItem('authToken');
+      other.removeItem('authUser');
+
+      toast.success(`Welcome back, ${data.user.name}!`);
+      onLogin({ email, password, rememberMe });
+    } catch (err: any) {
       setErrors({ general: 'Login failed. Please try again.' });
       toast.error('Login failed');
     } finally {
@@ -85,27 +99,22 @@ export function Login({ onLogin }: LoginProps) {
     }
   };
 
-
-
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
       <AnimatedBackground />
-      
-      {/* Main Login Container */}
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
         className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-2 gap-8 relative z-10"
       >
-        {/* Left Side - Branding & Features */}
+        {/* Left - Branding */}
         <motion.div
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.2, duration: 0.6 }}
           className="hidden lg:flex flex-col justify-center space-y-8 p-8"
         >
-          {/* Logo & Branding */}
           <div className="space-y-4">
             <motion.div
               initial={{ scale: 0 }}
@@ -123,7 +132,7 @@ export function Login({ onLogin }: LoginProps) {
                 <p className="text-sm text-muted-foreground">Purchase Management System</p>
               </div>
             </motion.div>
-            
+
             <motion.h2
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -132,7 +141,7 @@ export function Login({ onLogin }: LoginProps) {
             >
               Streamline Your Business Operations
             </motion.h2>
-            
+
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -144,7 +153,6 @@ export function Login({ onLogin }: LoginProps) {
             </motion.p>
           </div>
 
-          {/* Features */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -170,7 +178,7 @@ export function Login({ onLogin }: LoginProps) {
           </motion.div>
         </motion.div>
 
-        {/* Right Side - Login Form */}
+        {/* Right - Login Form (unchanged UI) */}
         <motion.div
           initial={{ opacity: 0, x: 50 }}
           animate={{ opacity: 1, x: 0 }}
@@ -196,7 +204,6 @@ export function Login({ onLogin }: LoginProps) {
             
             <CardContent className="space-y-6">
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* General Error */}
                 {errors.general && (
                   <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
@@ -204,7 +211,6 @@ export function Login({ onLogin }: LoginProps) {
                   </Alert>
                 )}
 
-                {/* Email Field */}
                 <div className="space-y-2">
                   <Label htmlFor="email" className="flex items-center gap-2">
                     <Mail className="w-4 h-4" />
@@ -219,12 +225,9 @@ export function Login({ onLogin }: LoginProps) {
                     className={`h-12 ${errors.email ? 'border-red-500' : ''}`}
                     disabled={isLoading}
                   />
-                  {errors.email && (
-                    <p className="text-sm text-red-500">{errors.email}</p>
-                  )}
+                  {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
                 </div>
 
-                {/* Password Field */}
                 <div className="space-y-2">
                   <Label htmlFor="password" className="flex items-center gap-2">
                     <Lock className="w-4 h-4" />
@@ -251,12 +254,9 @@ export function Login({ onLogin }: LoginProps) {
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>
                   </div>
-                  {errors.password && (
-                    <p className="text-sm text-red-500">{errors.password}</p>
-                  )}
+                  {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
                 </div>
 
-                {/* Remember Me & Forgot Password */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -274,7 +274,6 @@ export function Login({ onLogin }: LoginProps) {
                   </Button>
                 </div>
 
-                {/* Login Button */}
                 <Button
                   type="submit"
                   className="w-full h-12 bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 text-white font-medium"
@@ -294,7 +293,6 @@ export function Login({ onLogin }: LoginProps) {
                 </Button>
               </form>
 
-              {/* Login Instructions */}
               <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                 <p className="text-sm text-muted-foreground text-center">
                   Use your FedHub Software Solutions account to sign in
@@ -306,4 +304,22 @@ export function Login({ onLogin }: LoginProps) {
       </motion.div>
     </div>
   );
+}
+
+/** Call this from your header/menu to log out */
+export async function logout() {
+  const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+  try {
+    await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+  } catch {
+    // ignore network errors here
+  }
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('authUser');
+  sessionStorage.removeItem('authToken');
+  sessionStorage.removeItem('authUser');
+  // Optional: toast here or redirect in your calling code
 }

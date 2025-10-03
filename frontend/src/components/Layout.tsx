@@ -1,6 +1,26 @@
-import { useState } from 'react';
-import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarProvider, SidebarTrigger } from './ui/sidebar';
-import { BarChart3, ShoppingCart, Users, FileText, Home, Settings, Menu, Wallet } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from './ui/sidebar';
+import {
+  BarChart3,
+  ShoppingCart,
+  Users,
+  FileText,
+  Home,
+  Settings as SettingsIcon,
+  Menu,
+  Wallet,
+} from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface LayoutProps {
@@ -9,16 +29,51 @@ interface LayoutProps {
   onPageChange: (page: string) => void;
 }
 
+type Role = 'admin' | 'employee';
+
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: Home },
   { id: 'purchases', label: 'Purchases', icon: ShoppingCart },
   { id: 'clients', label: 'Clients', icon: Users },
   { id: 'invoices', label: 'Invoices', icon: FileText },
   { id: 'finance', label: 'Finance', icon: Wallet },
-  { id: 'settings', label: 'Settings', icon: Settings },
+  // Settings is admin-only — we’ll filter it out at render time based on role
+  { id: 'settings', label: 'Settings', icon: SettingsIcon, role: 'admin' as Role },
 ];
 
+// Helper to read the current auth user role from storage
+function readRoleFromStorage(): Role {
+  try {
+    const raw =
+      localStorage.getItem('authUser') ?? sessionStorage.getItem('authUser');
+    if (!raw) return 'employee';
+    const parsed = JSON.parse(raw) as { role?: string };
+    const role = (parsed?.role ?? 'employee').toLowerCase();
+    return role === 'admin' ? 'admin' : 'employee';
+  } catch {
+    return 'employee';
+  }
+}
+
 export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
+  const [role, setRole] = useState<Role>(readRoleFromStorage());
+
+  // Keep role in sync if another tab logs in/out or role changes
+  useEffect(() => {
+    const handleStorage = () => setRole(readRoleFromStorage());
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  // Only show Settings to admins; everything else is always visible
+  const visibleMenuItems = useMemo(
+    () =>
+      menuItems.filter(
+        (item) => !('role' in item) || (item as any).role === role
+      ),
+    [role]
+  );
+
   return (
     <SidebarProvider>
       <div className="flex h-full w-full">
@@ -27,7 +82,7 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
             {/* Sidebar Background Effect */}
             <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 via-purple-500/5 to-pink-500/5 pointer-events-none" />
             <div className="p-4 border-b border-white/20 relative z-10">
-              <motion.div 
+              <motion.div
                 className="flex items-center gap-3"
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
@@ -57,7 +112,7 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
             <SidebarGroup className="relative z-10">
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {menuItems.map((item, index) => (
+                  {visibleMenuItems.map((item, index) => (
                     <motion.div
                       key={item.id}
                       initial={{ opacity: 0, x: -20 }}
@@ -78,7 +133,7 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
                             <motion.div
                               className="absolute right-2 w-2 h-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500"
                               layoutId="activeIndicator"
-                              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                             />
                           )}
                         </SidebarMenuButton>
@@ -90,7 +145,7 @@ export function Layout({ children, currentPage, onPageChange }: LayoutProps) {
             </SidebarGroup>
           </SidebarContent>
         </Sidebar>
-        
+
         <main className="flex-1 overflow-auto p-6 bg-background/50">
           {children}
         </main>
