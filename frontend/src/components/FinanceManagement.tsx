@@ -1,23 +1,34 @@
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Textarea } from './ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-
-import { motion } from 'motion/react';
-import { 
-  Wallet, 
-  TrendingDown, 
-  TrendingUp, 
-  Receipt, 
-  Plus, 
-  Edit, 
+// FinanaceManagement.tsx
+import React, { useMemo, useRef, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./ui/select";
+import { Textarea } from "./ui/textarea";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import { motion } from "motion/react";
+import {
+  Wallet,
+  TrendingDown,
+  TrendingUp,
+  Receipt,
+  Plus,
+  Edit,
   Trash2,
   DollarSign,
   Calculator,
@@ -26,258 +37,473 @@ import {
   Filter,
   UploadCloud,
   Search,
-  X
-} from 'lucide-react';
-import { GlassCard } from './GlassCard';
-import { Breadcrumb } from './Breadcrumb';
-import { toast } from 'sonner@2.0.3';
+  X,
+  Inbox,
+} from "lucide-react";
+import { GlassCard } from "./GlassCard";
+import { Breadcrumb } from "./Breadcrumb";
+import { toast } from "sonner";
 
-interface FinanceRecord {
-  id: string;
-  type: 'invested' | 'expense' | 'tds';
-  category: string;
-  amount: number;
-  description: string;
-  date: Date;
-  paymentMethod: string;
-  status: 'completed' | 'pending' | 'failed';
-  reference?: string;
-  taxYear?: string; // For TDS records
-}
+// ⬇️ RTK Query hooks & types (adjust the import path if needed)
+import {
+  useListFinanceQuery,
+  useGetFinanceStatsQuery,
+  useCreateFinanceMutation,
+  useUpdateFinanceMutation,
+  useDeleteFinanceMutation,
+  FinanceRecord as ApiFinanceRecord,
+  FinStatus,
+  FinType,
+} from "../lib/api/slices/finance";
 
-const mockFinanceData: FinanceRecord[] = [
-  {
-    id: '1',
-    type: 'invested',
-    category: 'Equipment',
-    amount: 250000,
-    description: 'New development servers and workstations',
-    date: new Date('2024-09-15'),
-    paymentMethod: 'Bank Transfer',
-    status: 'completed',
-    reference: 'INV-EQ-001'
-  },
-  {
-    id: '2',
-    type: 'expense',
-    category: 'Office Rent',
-    amount: 45000,
-    description: 'Monthly office rent - September 2024',
-    date: new Date('2024-09-01'),
-    paymentMethod: 'UPI',
-    status: 'completed',
-    reference: 'RENT-SEP-2024'
-  },
-  {
-    id: '3',
-    type: 'expense',
-    category: 'Software Licenses',
-    amount: 28000,
-    description: 'Annual software licenses renewal',
-    date: new Date('2024-09-10'),
-    paymentMethod: 'Credit Card',
-    status: 'completed',
-    reference: 'LIC-2024-001'
-  },
-  {
-    id: '4',
-    type: 'tds',
-    category: 'Professional Services',
-    amount: 12500,
-    description: 'TDS on consultant payment',
-    date: new Date('2024-09-20'),
-    paymentMethod: 'Bank Transfer',
-    status: 'completed',
-    reference: 'TDS-PS-001',
-    taxYear: '2024-25'
-  },
-  {
-    id: '5',
-    type: 'invested',
-    category: 'Marketing',
-    amount: 75000,
-    description: 'Digital marketing campaign investment',
-    date: new Date('2024-09-25'),
-    paymentMethod: 'Bank Transfer',
-    status: 'completed',
-    reference: 'MKT-DIG-001'
-  },
-  {
-    id: '6',
-    type: 'expense',
-    category: 'Utilities',
-    amount: 8500,
-    description: 'Electricity and internet bills',
-    date: new Date('2024-09-28'),
-    paymentMethod: 'UPI',
-    status: 'pending',
-    reference: 'UTIL-SEP-2024'
-  }
-];
-
-const categoryOptions = {
-  invested: ['Equipment', 'Technology', 'Marketing', 'R&D', 'Infrastructure', 'Training'],
-  expense: ['Office Rent', 'Utilities', 'Software Licenses', 'Travel', 'Supplies', 'Professional Services'],
-  tds: ['Professional Services', 'Rent', 'Interest', 'Commission', 'Contractor Payments', 'Other']
+/* ------------------------------------------------------------------ */
+/* Helpers & constants                                                 */
+/* ------------------------------------------------------------------ */
+const categoryOptions: Record<FinType, string[]> = {
+  invested: ["Equipment", "Technology", "Marketing", "R&D", "Infrastructure", "Training"],
+  expense: [
+    "Office Rent",
+    "Utilities",
+    "Software Licenses",
+    "Travel",
+    "Supplies",
+    "Professional Services",
+  ],
+  tds: ["Professional Services", "Rent", "Interest", "Commission", "Contractor Payments", "Other"],
 };
 
-const paymentMethods = ['Bank Transfer', 'UPI', 'Credit Card', 'Debit Card', 'Cash', 'Cheque'];
+const paymentMethods = ["Bank Transfer", "UPI", "Credit Card", "Debit Card", "Cash", "Cheque"];
 
+const toDate = (iso?: string | Date) => {
+  if (!iso) return new Date();
+  if (iso instanceof Date) return iso;
+  return new Date(iso);
+};
+
+const yyyyMmDd = (d: Date) => d.toISOString().slice(0, 10);
+
+const fmtINR = (n: number) =>
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(n);
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "completed":
+      return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
+    case "pending":
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400";
+    case "failed":
+      return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
+    default:
+      return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
+  }
+};
+
+const getTypeColor = (type: string) => {
+  switch (type) {
+    case "invested":
+      return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
+    case "expense":
+      return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
+    case "tds":
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400";
+    default:
+      return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/* Component                                                           */
+/* ------------------------------------------------------------------ */
 export function FinanceManagement() {
-  const [currentView, setCurrentView] = useState('overview');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('all');
-  // Records view specific filters (for compatibility)
-  const [selectedType, setSelectedType] = useState<'invested' | 'expense' | 'tds' | 'all'>('all');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-  const [financeData, setFinanceData] = useState<FinanceRecord[]>(mockFinanceData);
-  const [selectedRecord, setSelectedRecord] = useState<FinanceRecord | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  
-  // Form state
-  const [formData, setFormData] = useState({
-    type: 'expense' as 'invested' | 'expense' | 'tds',
-    category: '',
-    amount: '',
-    description: '',
-    date: new Date().toISOString().split('T')[0],
-    paymentMethod: '',
-    status: 'completed' as 'completed' | 'pending' | 'failed',
-    reference: '',
-    taxYear: ''
+  const [currentView, setCurrentView] = useState<"overview" | "form" | "records">("overview");
+  const [formMode, setFormMode] = useState<"create" | "edit">("create");
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Overview filters
+  const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState<FinType | "all">("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<FinStatus | "all">("all");
+
+  // Records view filters
+  const [selectedType, setSelectedType] = useState<FinType | "all">("all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedStatus, setSelectedStatus] = useState<FinStatus | "all">("all");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("all");
+
+  // Add/Edit form state
+  const [formData, setFormData] = useState<{
+    type: FinType;
+    category: string;
+    amount: string;
+    description: string;
+    date: string; // yyyy-mm-dd
+    paymentMethod: string;
+    status: FinStatus;
+    reference: string;
+    taxYear: string;
+  }>({
+    type: "expense",
+    category: "",
+    amount: "",
+    description: "",
+    date: yyyyMmDd(new Date()),
+    paymentMethod: "",
+    status: "completed",
+    reference: "",
+    taxYear: "",
   });
 
-  // Calculate totals
-  const totalInvested = financeData
-    .filter(record => record.type === 'invested' && record.status === 'completed')
-    .reduce((sum, record) => sum + record.amount, 0);
+  // File input for Bulk Upload
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
-  const totalExpenses = financeData
-    .filter(record => record.type === 'expense' && record.status === 'completed')
-    .reduce((sum, record) => sum + record.amount, 0);
+  /* -------------------------------------------------------------- */
+  /* Query args & RTK Query calls                                   */
+  /* -------------------------------------------------------------- */
+  const listArgs = useMemo(
+    () => ({
+      search: searchTerm || undefined,
+      type: (currentView === "records" ? selectedType : typeFilter) || "all",
+      category: (currentView === "records" ? selectedCategory : categoryFilter) || "all",
+      status: (currentView === "records" ? selectedStatus : statusFilter) || "all",
+      paymentMethod: currentView === "records" ? selectedPaymentMethod : "all",
+      order: "desc" as const,
+      limit: 500,
+    }),
+    [
+      currentView,
+      searchTerm,
+      typeFilter,
+      selectedType,
+      categoryFilter,
+      selectedCategory,
+      statusFilter,
+      selectedStatus,
+      selectedPaymentMethod,
+    ]
+  );
 
-  const totalTDS = financeData
-    .filter(record => record.type === 'tds' && record.status === 'completed')
-    .reduce((sum, record) => sum + record.amount, 0);
+  const {
+    data: listData,
+    isFetching,
+    refetch: refetchList,
+  } = useListFinanceQuery(listArgs);
 
-  const profit = totalInvested - totalExpenses - totalTDS;
+  const {
+    data: statsData,
+    refetch: refetchStats,
+  } = useGetFinanceStatsQuery({
+    search: listArgs.search,
+    type: listArgs.type,
+    category: listArgs.category,
+    status: listArgs.status,
+    paymentMethod: listArgs.paymentMethod,
+  });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
-      case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400';
-      case 'failed': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
+  const [createFinance, { isLoading: creating }] = useCreateFinanceMutation();
+  const [updateFinance, { isLoading: updating }] = useUpdateFinanceMutation();
+  const [deleteFinance, { isLoading: removing }] = useDeleteFinanceMutation();
+
+  const financeData = useMemo(
+    () =>
+      (listData?.items ?? []).map((x: ApiFinanceRecord) => ({
+        ...x,
+        date: toDate(x.date),
+        createdAt: toDate(x.createdAt),
+        updatedAt: toDate(x.updatedAt),
+      })),
+    [listData]
+  );
+
+  /* -------------------------------------------------------------- */
+  /* Derived helpers for filters & KPI                              */
+  /* -------------------------------------------------------------- */
+  const availableCategories = useMemo(() => {
+    const typeInUse = currentView === "records" ? selectedType : typeFilter;
+    if (typeInUse === "all") {
+      return Array.from(new Set(financeData.map((r) => r.category))).sort();
     }
+    return categoryOptions[typeInUse as FinType];
+  }, [currentView, selectedType, typeFilter, financeData]);
+
+  const availablePaymentMethods = useMemo(
+    () => Array.from(new Set(financeData.map((r) => r.paymentMethod))).sort(),
+    [financeData]
+  );
+
+  // client-side text search + extra filters (keeps UI snappy)
+  const locallyFiltered = useMemo(() => {
+    const s = (listArgs.search || "").toLowerCase();
+    return financeData.filter((r) => {
+      const searchMatch =
+        !s ||
+        r.description.toLowerCase().includes(s) ||
+        r.category.toLowerCase().includes(s) ||
+        r.paymentMethod.toLowerCase().includes(s) ||
+        (r.reference || "").toLowerCase().includes(s);
+
+      const typeMatch = listArgs.type === "all" || r.type === listArgs.type;
+      const categoryMatch = listArgs.category === "all" || r.category === listArgs.category;
+      const statusMatch = listArgs.status === "all" || r.status === listArgs.status;
+      const pmMatch =
+        listArgs.paymentMethod === "all" || r.paymentMethod === listArgs.paymentMethod;
+
+      return searchMatch && typeMatch && categoryMatch && statusMatch && pmMatch;
+    });
+  }, [financeData, listArgs]);
+
+  // KPI cards — use server stats when present; else fallback to computed
+  const kpi = useMemo(() => {
+    if (statsData) return statsData;
+    const invested = financeData
+      .filter((r) => r.type === "invested" && r.status === "completed")
+      .reduce((s, r) => s + r.amount, 0);
+    const expenses = financeData
+      .filter((r) => r.type === "expense" && r.status === "completed")
+      .reduce((s, r) => s + r.amount, 0);
+    const tds = financeData
+      .filter((r) => r.type === "tds" && r.status === "completed")
+      .reduce((s, r) => s + r.amount, 0);
+    return {
+      totalInvested: invested,
+      totalExpenses: expenses,
+      totalTDS: tds,
+      profit: invested - expenses - tds,
+    };
+  }, [statsData, financeData]);
+
+  /* -------------------------------------------------------------- */
+  /* CRUD handlers                                                  */
+  /* -------------------------------------------------------------- */
+
+  const resetForm = () =>
+    setFormData({
+      type: "expense",
+      category: "",
+      amount: "",
+      description: "",
+      date: yyyyMmDd(new Date()),
+      paymentMethod: "",
+      status: "completed",
+      reference: "",
+      taxYear: "",
+    });
+
+  const startCreate = () => {
+    setFormMode("create");
+    setEditingId(null);
+    resetForm();
+    setCurrentView("form");
   };
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'invested': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400';
-      case 'expense': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400';
-      case 'tds': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400';
-    }
+  const startEdit = (r: ApiFinanceRecord) => {
+    setFormMode("edit");
+    setEditingId(r.id);
+    setFormData({
+      type: r.type,
+      category: r.category,
+      amount: String(r.amount ?? ""),
+      description: r.description ?? "",
+      date: yyyyMmDd(toDate(r.date)),
+      paymentMethod: r.paymentMethod ?? "",
+      status: r.status as FinStatus,
+      reference: r.reference ?? "",
+      taxYear: r.taxYear ?? "",
+    });
+    setCurrentView("form");
   };
 
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!formData.category || !formData.amount || !formData.description || !formData.paymentMethod) {
-      toast.error('Please fill in all required fields');
+      toast.error("Please fill in all required fields");
       return;
     }
 
-    const newRecord: FinanceRecord = {
-      id: `${Date.now()}`,
+    const payload = {
       type: formData.type,
       category: formData.category,
-      amount: parseFloat(formData.amount),
+      amount: Number(formData.amount || 0),
       description: formData.description,
-      date: new Date(formData.date),
+      date: new Date(formData.date).toISOString(),
       paymentMethod: formData.paymentMethod,
       status: formData.status,
-      reference: formData.reference || `${formData.type.toUpperCase()}-${Date.now()}`,
-      taxYear: formData.type === 'tds' ? formData.taxYear : undefined
+      reference:
+        formData.reference || `${formData.type.toUpperCase()}-${Date.now().toString().slice(-6)}`,
+      taxYear: formData.type === "tds" ? formData.taxYear : undefined,
     };
 
-    setFinanceData([...financeData, newRecord]);
-    
-    // Reset form
-    setFormData({
-      type: 'expense',
-      category: '',
-      amount: '',
-      description: '',
-      date: new Date().toISOString().split('T')[0],
-      paymentMethod: '',
-      status: 'completed',
-      reference: '',
-      taxYear: ''
-    });
-    
-    toast.success('Finance record added successfully');
-    setCurrentView('records');
+    try {
+      if (formMode === "create") {
+        await createFinance(payload).unwrap();
+        toast.success("Finance record added");
+      } else if (editingId) {
+        await updateFinance({ id: editingId, data: payload }).unwrap();
+        toast.success("Finance record updated");
+      }
+      // Refresh queries and go to main Finance page (overview) without changing UI context
+      await Promise.all([refetchList(), refetchStats()]);
+      setCurrentView("overview");
+    } catch (err: any) {
+      toast.error(err?.data?.error || err?.message || "Failed to save record");
+    }
   };
 
-  // Reset form when navigating to add record
-  const handleAddRecord = () => {
-    setFormData({
-      type: 'expense',
-      category: '',
-      amount: '',
-      description: '',
-      date: new Date().toISOString().split('T')[0],
-      paymentMethod: '',
-      status: 'completed',
-      reference: '',
-      taxYear: ''
-    });
-    setCurrentView('addRecord');
+  const confirmDelete = async (id: string) => {
+    try {
+      await deleteFinance({ id }).unwrap();
+      toast.success("Record deleted");
+      await Promise.all([refetchList(), refetchStats()]);
+    } catch (err: any) {
+      toast.error(err?.data?.error || err?.message || "Failed to delete");
+    }
   };
 
+  /* -------------------------------------------------------------- */
+  /* Bulk Upload (CSV or JSON)                                      */
+  /* -------------------------------------------------------------- */
+  const onBulkUploadClick = () => uploadInputRef.current?.click();
 
+  const parseCSV = (text: string) => {
+    // Simple CSV (no quoted commas). Columns expected:
+    // type,category,amount,description,date,paymentMethod,status,reference,taxYear
+    const lines = text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
 
-  // Get unique categories for filter dropdown
-  const uniqueCategories = Array.from(new Set(financeData.map(record => record.category))).sort();
+    if (lines.length === 0) return [];
 
-  // Filter data - use appropriate filter state based on current view
-  const filteredData = financeData.filter(record => {
-    const searchMatch = searchTerm === '' || 
-      record.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.paymentMethod.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.reference?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // Use overview filters for overview, records filters for records view
-    const currentTypeFilter = currentView === 'records' ? selectedType : typeFilter;
-    const currentCategoryFilter = currentView === 'records' ? selectedCategory : categoryFilter;
-    const currentStatusFilter = currentView === 'records' ? selectedStatus : statusFilter;
-    
-    const typeMatch = currentTypeFilter === 'all' || record.type === currentTypeFilter;
-    const categoryMatch = currentCategoryFilter === 'all' || record.category === currentCategoryFilter;
-    const statusMatch = currentStatusFilter === 'all' || record.status === currentStatusFilter;
-    
-    return searchMatch && typeMatch && categoryMatch && statusMatch;
-  });
+    const header = lines[0].split(",").map((h) => h.trim().toLowerCase());
+    const idx = (k: string) => header.indexOf(k);
 
-  const breadcrumbItems = [
-    { label: 'Home', onClick: () => {} }
-  ];
+    const rows = lines.slice(1).map((line) => line.split(","));
+    return rows.map((cols) => ({
+      type: (cols[idx("type")] || "").trim() as FinType,
+      category: (cols[idx("category")] || "").trim(),
+      amount: Number((cols[idx("amount")] || "0").trim()),
+      description: (cols[idx("description")] || "").trim(),
+      date: new Date((cols[idx("date")] || "").trim()).toISOString(),
+      paymentMethod: (cols[idx("paymentmethod")] || cols[idx("payment_method")] || "").trim(),
+      status: ((cols[idx("status")] || "completed").trim() as FinStatus) || "completed",
+      reference: (cols[idx("reference")] || "").trim(),
+      taxYear: (cols[idx("taxyear")] || cols[idx("tax_year")] || "").trim() || undefined,
+    }));
+  };
 
-  if (currentView === 'overview') {
+  const handleBulkFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // reset so same file can be uploaded again
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      let records: any[] = [];
+
+      if (file.name.toLowerCase().endsWith(".json")) {
+        const json = JSON.parse(text);
+        records = Array.isArray(json) ? json : json?.records || [];
+      } else if (file.name.toLowerCase().endsWith(".csv")) {
+        records = parseCSV(text);
+      } else {
+        toast.error("Unsupported file type. Use .csv or .json");
+        return;
+      }
+
+      if (!Array.isArray(records) || records.length === 0) {
+        toast.error("No valid records found in file");
+        return;
+      }
+
+      // Normalize each record
+      const normalized = records.map((r, i) => ({
+        type: (r.type || "expense") as FinType,
+        category: r.category || "",
+        amount: Number(r.amount || 0),
+        description: r.description || `Imported record #${i + 1}`,
+        date: new Date(r.date || new Date()).toISOString(),
+        paymentMethod: r.paymentMethod || "Bank Transfer",
+        status: (r.status || "completed") as FinStatus,
+        reference:
+          r.reference || `${(r.type || "EXP").toString().toUpperCase()}-${Date.now().toString().slice(-6)}`,
+        taxYear: r.taxYear || undefined,
+      }));
+
+      toast.message("Bulk upload started", {
+        description: `Uploading ${normalized.length} records…`,
+      });
+
+      // Send sequentially to keep API happy
+      let ok = 0;
+      let fail = 0;
+      /* eslint-disable no-await-in-loop */
+      for (const rec of normalized) {
+        try {
+          await createFinance(rec).unwrap();
+          ok++;
+        } catch {
+          fail++;
+        }
+      }
+      /* eslint-enable no-await-in-loop */
+
+      await Promise.all([refetchList(), refetchStats()]);
+
+      if (fail === 0) {
+        toast.success(`Bulk upload complete (${ok} records)`);
+      } else {
+        toast.warning(`Bulk upload finished: ${ok} succeeded, ${fail} failed`);
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Bulk upload failed");
+    }
+  };
+
+  const breadcrumbItems = [{ label: "Home", onClick: () => {} }];
+
+  /* =======================================================================
+   * EMPTY STATE (matches style used in ClientManagement)
+   * ======================================================================= */
+  const EmptyState = ({
+    title = "No records found",
+    subtitle = "Get started by adding your first finance record.",
+  }: {
+    title?: string;
+    subtitle?: string;
+  }) => (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="p-4 rounded-2xl bg-muted/50 mb-4">
+        <Inbox className="w-8 h-8 text-muted-foreground" />
+      </div>
+      <h3 className="text-lg font-semibold">{title}</h3>
+      <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+      <div className="mt-6 flex items-center gap-3">
+        <Button onClick={startCreate}>
+          <Plus className="w-4 h-4 mr-2" />
+          Add Record
+        </Button>
+        <Button variant="outline" onClick={onBulkUploadClick}>
+          <UploadCloud className="w-4 h-4 mr-2" />
+          Bulk Upload
+        </Button>
+      </div>
+    </div>
+  );
+
+  /* =======================================================================
+   * OVERVIEW
+   * ======================================================================= */
+  if (currentView === "overview") {
+    const noData = (listData?.items?.length ?? 0) === 0;
+
     return (
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-8"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
         <Breadcrumb items={breadcrumbItems} currentPage="Finance" />
-        
+
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
@@ -285,339 +511,225 @@ export function FinanceManagement() {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <Button 
-              variant="outline"
-              className="border-blue-200 text-blue-700 hover:bg-blue-50"
-            >
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept=".csv,.json,application/json,text/csv"
+              className="hidden"
+              onChange={handleBulkFile}
+            />
+            <Button variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50" onClick={onBulkUploadClick}>
               <UploadCloud className="w-4 h-4 mr-2" />
               Bulk Upload
             </Button>
-            <Button 
-              onClick={() => setCurrentView('addRecord')}
-              className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
-            >
+            <Button onClick={startCreate} className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700">
               <Plus className="w-4 h-4 mr-2" />
               Add Record
             </Button>
           </div>
         </div>
 
-        {/* Financial KPI Cards */}
+        {/* KPI Cards (use real stats from API; fallback to computed) */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <GlassCard className="group cursor-pointer" onClick={() => setCurrentView('records')}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Invested</CardTitle>
-                <motion.div
-                  whileHover={{ rotate: 360, scale: 1.1 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Wallet className="h-4 w-4 text-green-600" />
-                </motion.div>
-              </CardHeader>
-              <CardContent>
-                <motion.div 
-                  className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                >
-                  ₹{totalInvested.toLocaleString()}
-                </motion.div>
-                <p className="text-xs text-muted-foreground">
-                  <TrendingUp className="inline w-3 h-3 mr-1 text-green-500" />
-                  Capital investments & assets
-                </p>
-              </CardContent>
-            </GlassCard>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <GlassCard className="group cursor-pointer" onClick={() => setCurrentView('records')}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-                <motion.div
-                  whileHover={{ rotate: 360, scale: 1.1 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <TrendingDown className="h-4 w-4 text-red-600" />
-                </motion.div>
-              </CardHeader>
-              <CardContent>
-                <motion.div 
-                  className="text-2xl font-bold bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
-                >
-                  ₹{totalExpenses.toLocaleString()}
-                </motion.div>
-                <p className="text-xs text-muted-foreground">
-                  Operating costs & overheads
-                </p>
-              </CardContent>
-            </GlassCard>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-          >
-            <GlassCard className="group cursor-pointer" onClick={() => setCurrentView('records')}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-                <motion.div
-                  whileHover={{ rotate: 360, scale: 1.1 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Calculator className="h-4 w-4 text-blue-600" />
-                </motion.div>
-              </CardHeader>
-              <CardContent>
-                <motion.div 
-                  className={`text-2xl font-bold bg-gradient-to-r ${profit >= 0 ? 'from-blue-600 to-indigo-600' : 'from-red-600 to-rose-600'} bg-clip-text text-transparent`}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.4, type: "spring", stiffness: 200 }}
-                >
-                  ₹{profit.toLocaleString()}
-                </motion.div>
-                <p className="text-xs text-muted-foreground">
-                  {profit >= 0 ? (
-                    <>
-                      <TrendingUp className="inline w-3 h-3 mr-1 text-green-500" />
-                      Profit after expenses & TDS
-                    </>
-                  ) : (
-                    <>
-                      <TrendingDown className="inline w-3 h-3 mr-1 text-red-500" />
-                      Loss after expenses & TDS
-                    </>
-                  )}
-                </p>
-              </CardContent>
-            </GlassCard>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            <GlassCard className="group cursor-pointer" onClick={() => setCurrentView('records')}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total TDS</CardTitle>
-                <motion.div
-                  whileHover={{ rotate: 360, scale: 1.1 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Receipt className="h-4 w-4 text-orange-600" />
-                </motion.div>
-              </CardHeader>
-              <CardContent>
-                <motion.div 
-                  className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
-                >
-                  ₹{totalTDS.toLocaleString()}
-                </motion.div>
-                <p className="text-xs text-muted-foreground">
-                  Tax deducted at source
-                </p>
-              </CardContent>
-            </GlassCard>
-          </motion.div>
-        </div>
-
-        {/* Search */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <GlassCard>
-            <CardHeader>
-              <CardTitle className="bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent flex items-center gap-2">
-                <Filter className="h-5 w-5" />
-                <span className="text-sm">Search & Filters</span>
-              </CardTitle>
+          <GlassCard className="group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Invested</CardTitle>
+              <Wallet className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {/* Single Row with Search and Filters */}
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
-                  {/* Search Input */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Search</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                      <Input
-                        placeholder="Search records..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 bg-white/70 dark:bg-gray-800/70"
-                      />
-                      {searchTerm && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSearchTerm('')}
-                          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
+              <div className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                {fmtINR(kpi.totalInvested || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                <TrendingUp className="inline w-3 h-3 mr-1 text-green-500" />
+                Capital investments & assets
+              </p>
+            </CardContent>
+          </GlassCard>
 
-                  {/* Type Filter */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Type</Label>
-                    <Select value={typeFilter} onValueChange={setTypeFilter}>
-                      <SelectTrigger className="bg-white/70 dark:bg-gray-800/70">
-                        <SelectValue placeholder="All Types" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="invested">
-                          <div className="flex items-center space-x-2">
-                            <Wallet className="w-4 h-4 text-green-600" />
-                            <span>Invested</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="expense">
-                          <div className="flex items-center space-x-2">
-                            <TrendingDown className="w-4 h-4 text-red-600" />
-                            <span>Expense</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="tds">
-                          <div className="flex items-center space-x-2">
-                            <Receipt className="w-4 h-4 text-orange-600" />
-                            <span>TDS</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+          <GlassCard className="group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+              <TrendingDown className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold bg-gradient-to-r from-red-600 to-rose-600 bg-clip-text text-transparent">
+                {fmtINR(kpi.totalExpenses || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">Operating costs & overheads</p>
+            </CardContent>
+          </GlassCard>
 
-                  {/* Category Filter */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Category</Label>
-                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                      <SelectTrigger className="bg-white/70 dark:bg-gray-800/70">
-                        <SelectValue placeholder="All Categories" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Categories</SelectItem>
-                        {uniqueCategories.map(category => (
-                          <SelectItem key={category} value={category}>{category}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+          <GlassCard className="group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
+              <Calculator className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div
+                className={`text-2xl font-bold bg-gradient-to-r ${
+                  (kpi.profit || 0) >= 0 ? "from-blue-600 to-indigo-600" : "from-red-600 to-rose-600"
+                } bg-clip-text text-transparent`}
+              >
+                {fmtINR(kpi.profit || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {(kpi.profit || 0) >= 0 ? (
+                  <>
+                    <TrendingUp className="inline w-3 h-3 mr-1 text-green-500" />
+                    Profit after expenses & TDS
+                  </>
+                ) : (
+                  <>
+                    <TrendingDown className="inline w-3 h-3 mr-1 text-red-500" />
+                    Loss after expenses & TDS
+                  </>
+                )}
+              </p>
+            </CardContent>
+          </GlassCard>
 
-                  {/* Status Filter */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Status</Label>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger className="bg-white/70 dark:bg-gray-800/70">
-                        <SelectValue placeholder="All Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="completed">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                            <span>Completed</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="pending">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                            <span>Pending</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="failed">
-                          <div className="flex items-center space-x-2">
-                            <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                            <span>Failed</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+          <GlassCard className="group">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total TDS</CardTitle>
+              <Receipt className="h-4 w-4 text-orange-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">
+                {fmtINR(kpi.totalTDS || 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">Tax deducted at source</p>
+            </CardContent>
+          </GlassCard>
+        </div>
 
-                {/* Clear Filters */}
-                {(searchTerm || typeFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all') && (
-                  <div className="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
+        {/* Search & Filters */}
+        <GlassCard>
+          <CardHeader>
+            <CardTitle className="bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              <span className="text-sm">Search & Filters</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-end">
+              {/* Search */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Search records..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 bg-white/70 dark:bg-gray-800/70"
+                  />
+                  {searchTerm && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        setSearchTerm('');
-                        setTypeFilter('all');
-                        setCategoryFilter('all');
-                        setStatusFilter('all');
-                      }}
-                      className="text-muted-foreground hover:text-foreground"
+                      onClick={() => setSearchTerm("")}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 p-0"
                     >
-                      <X className="w-4 h-4 mr-1" />
-                      Clear Filters
+                      <X className="w-4 h-4" />
                     </Button>
-                  </div>
-                )}
-                
-                {/* Results Counter */}
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    {(searchTerm || typeFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all') ? (
-                      <>Showing {filteredData.length} of {financeData.length} records (filtered)</>
-                    ) : (
-                      <>Showing {filteredData.length} of {financeData.length} records</>
-                    )}
-                  </div>
-                  {(searchTerm || typeFilter !== 'all' || categoryFilter !== 'all' || statusFilter !== 'all') && (
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      Filters Active
-                    </Badge>
                   )}
                 </div>
               </div>
-            </CardContent>
-          </GlassCard>
-        </motion.div>
 
-        {/* Detailed Table */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-        >
-          <GlassCard>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  Finance Records
-                </CardTitle>
-                <Button variant="outline" onClick={() => setCurrentView('records')}>
+              {/* Type */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Type</Label>
+                <Select value={typeFilter} onValueChange={(v: any) => setTypeFilter(v)}>
+                  <SelectTrigger className="bg-white/70 dark:bg-gray-800/70">
+                    <SelectValue placeholder="All Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="invested">Invested</SelectItem>
+                    <SelectItem value="expense">Expense</SelectItem>
+                    <SelectItem value="tds">TDS</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Category */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Category</Label>
+                <Select value={categoryFilter} onValueChange={(v: any) => setCategoryFilter(v)}>
+                  <SelectTrigger className="bg-white/70 dark:bg-gray-800/70">
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {availableCategories.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Status */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Status</Label>
+                <Select value={statusFilter} onValueChange={(v: any) => setStatusFilter(v)}>
+                  <SelectTrigger className="bg-white/70 dark:bg-gray-800/70">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="failed">Failed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Results / clear */}
+            <div className="mt-4 flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                {isFetching ? "Loading…" : <>Showing {locallyFiltered.length} of {financeData.length} records</>}
+              </div>
+              {(searchTerm || typeFilter !== "all" || categoryFilter !== "all" || statusFilter !== "all") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setTypeFilter("all");
+                    setCategoryFilter("all");
+                    setStatusFilter("all");
+                  }}
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </GlassCard>
+
+        {/* Records Preview / Empty State */}
+        <GlassCard>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                Finance Records
+              </CardTitle>
+              {!noData && (
+                <Button variant="outline" onClick={() => setCurrentView("records")}>
                   View Full Table
                 </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {noData ? (
+              <EmptyState title="No finance records yet" subtitle="Add your first record or use bulk upload." />
+            ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -633,135 +745,127 @@ export function FinanceManagement() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredData
+                    {locallyFiltered
+                      .slice()
                       .sort((a, b) => b.date.getTime() - a.date.getTime())
                       .slice(0, 10)
-                      .map((record, index) => (
-                        <motion.tr 
-                          key={record.id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.8 + index * 0.05 }}
-                          className="hover:bg-white/50 dark:hover:bg-gray-800/50 transition-all duration-200"
-                        >
+                      .map((r) => (
+                        <TableRow key={r.id} className="hover:bg-muted/50">
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <div className={`p-2 rounded-lg ${
-                                record.type === 'invested' ? 'bg-green-100 dark:bg-green-900/20' :
-                                record.type === 'expense' ? 'bg-red-100 dark:bg-red-900/20' :
-                                'bg-orange-100 dark:bg-orange-900/20'
-                              }`}>
-                                {record.type === 'invested' ? (
+                              <div
+                                className={`p-2 rounded-lg ${
+                                  r.type === "invested"
+                                    ? "bg-green-100 dark:bg-green-900/20"
+                                    : r.type === "expense"
+                                    ? "bg-red-100 dark:bg-red-900/20"
+                                    : "bg-orange-100 dark:bg-orange-900/20"
+                                }`}
+                              >
+                                {r.type === "invested" ? (
                                   <Wallet className="w-4 h-4 text-green-600" />
-                                ) : record.type === 'expense' ? (
+                                ) : r.type === "expense" ? (
                                   <TrendingDown className="w-4 h-4 text-red-600" />
                                 ) : (
                                   <Receipt className="w-4 h-4 text-orange-600" />
                                 )}
                               </div>
-                              <span className="capitalize font-medium">{record.type}</span>
+                              <span className="capitalize font-medium">{r.type}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="font-medium">{record.description}</TableCell>
-                          <TableCell>{record.category}</TableCell>
+                          <TableCell className="font-medium">{r.description}</TableCell>
+                          <TableCell>{r.category}</TableCell>
                           <TableCell>
-                            <span className={`font-semibold ${
-                              record.type === 'invested' ? 'text-green-600' :
-                              record.type === 'expense' ? 'text-red-600' :
-                              'text-orange-600'
-                            }`}>
-                              {record.type === 'invested' ? '+' : '-'}₹{record.amount.toLocaleString()}
+                            <span
+                              className={`font-semibold ${
+                                r.type === "invested"
+                                  ? "text-green-600"
+                                  : r.type === "expense"
+                                  ? "text-red-600"
+                                  : "text-orange-600"
+                              }`}
+                            >
+                              {r.type === "invested" ? "+" : "-"}
+                              {fmtINR(r.amount)}
                             </span>
                           </TableCell>
-                          <TableCell>{record.date.toLocaleDateString()}</TableCell>
+                          <TableCell>{r.date.toLocaleDateString()}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="capitalize">
-                              {record.paymentMethod}
+                              {r.paymentMethod}
                             </Badge>
                           </TableCell>
                           <TableCell>
-                            <Badge className={getStatusColor(record.status)}>
-                              {record.status}
-                            </Badge>
+                            <Badge className={getStatusColor(r.status)}>{r.status}</Badge>
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  setSelectedRecord(record);
-                                  setIsDialogOpen(true);
-                                }}
-                                className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20"
+                                onClick={() => startEdit(r)}
+                                className="h-8 w-8 p-0"
                               >
                                 <Edit className="h-4 w-4 text-blue-600" />
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => {
-                                  setFinanceData(financeData.filter(item => item.id !== record.id));
-                                  toast.success('Record deleted successfully');
-                                }}
-                                className="h-8 w-8 p-0 hover:bg-red-100 dark:hover:bg-red-900/20"
+                                disabled={removing}
+                                onClick={() => confirmDelete(r.id)}
+                                className="h-8 w-8 p-0"
                               >
                                 <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>
                             </div>
                           </TableCell>
-                        </motion.tr>
+                        </TableRow>
                       ))}
                   </TableBody>
                 </Table>
               </div>
-              {filteredData.length > 10 && (
-                <div className="mt-4 text-center">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setCurrentView('records')}
-                    className="text-sm"
-                  >
-                    View All {filteredData.length} Records
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </GlassCard>
-        </motion.div>
-
+            )}
+          </CardContent>
+        </GlassCard>
       </motion.div>
     );
   }
 
-  // Add Record Submodule
-  if (currentView === 'addRecord') {
+  /* =======================================================================
+   * ADD / EDIT FORM (single page for both)
+   * ======================================================================= */
+  if (currentView === "form") {
     return (
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-8"
-      >
-        <Breadcrumb items={[...breadcrumbItems, { label: 'Finance', onClick: () => setCurrentView('overview') }]} currentPage="Add Record" />
-        
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+        <Breadcrumb
+          items={[...breadcrumbItems, { label: "Finance", onClick: () => setCurrentView("overview") }]}
+          currentPage={formMode === "create" ? "Add Record" : "Edit Record"}
+        />
+
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
-              Add Finance Record
+              {formMode === "create" ? "Add Finance Record" : "Edit Finance Record"}
             </h1>
             <p className="text-muted-foreground">
-              Create a new financial record for tracking investments, expenses, or TDS transactions
+              {formMode === "create"
+                ? "Create a new financial record for tracking investments, expenses, or TDS transactions"
+                : "Update the details of your finance record"}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Button 
-              variant="outline"
-              className="border-blue-200 text-blue-700 hover:bg-blue-50"
-            >
+            <input
+              ref={uploadInputRef}
+              type="file"
+              accept=".csv,.json,application/json,text/csv"
+              className="hidden"
+              onChange={handleBulkFile}
+            />
+            <Button variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50" onClick={onBulkUploadClick}>
               <UploadCloud className="w-4 h-4 mr-2" />
               Bulk Upload
             </Button>
-            <Button variant="outline" onClick={() => setCurrentView('overview')}>
+            <Button variant="outline" onClick={() => setCurrentView("overview")}>
               Back to Overview
             </Button>
           </div>
@@ -776,231 +880,163 @@ export function FinanceManagement() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-8">
-              {/* Basic Information */}
-              <div className="space-y-6">
-                <div className="border-b border-white/20 pb-4">
-                  <h3 className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Basic Information
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Essential details about the financial transaction
-                  </p>
+              {/* Basic */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Transaction Type *
+                  </Label>
+                  <Select
+                    value={formData.type}
+                    onValueChange={(v: any) => setFormData({ ...formData, type: v, category: "" })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="invested">Invested</SelectItem>
+                      <SelectItem value="expense">Expense</SelectItem>
+                      <SelectItem value="tds">TDS</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {/* Type */}
-                  <div className="space-y-3">
-                    <Label htmlFor="type" className="text-sm font-medium flex items-center gap-2">
-                      <DollarSign className="h-4 w-4" />
-                      Transaction Type *
-                    </Label>
-                    <Select 
-                      value={formData.type} 
-                      onValueChange={(value: 'invested' | 'expense' | 'tds') => 
-                        setFormData({...formData, type: value, category: ''})
-                      }
-                    >
-                      <SelectTrigger className="h-12 bg-white/5 border-white/20 hover:bg-white/10 transition-all">
-                        <SelectValue placeholder="Select transaction type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="invested" className="flex items-center gap-2">
-                          <Wallet className="h-4 w-4 text-green-600" />
-                          Invested
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Category *
+                  </Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(v: any) => setFormData({ ...formData, category: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categoryOptions[formData.type].map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
                         </SelectItem>
-                        <SelectItem value="expense" className="flex items-center gap-2">
-                          <TrendingDown className="h-4 w-4 text-red-600" />
-                          Expense
-                        </SelectItem>
-                        <SelectItem value="tds" className="flex items-center gap-2">
-                          <Receipt className="h-4 w-4 text-orange-600" />
-                          TDS
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  {/* Category */}
-                  <div className="space-y-3">
-                    <Label htmlFor="category" className="text-sm font-medium flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Category *
-                    </Label>
-                    <Select 
-                      value={formData.category} 
-                      onValueChange={(value) => setFormData({...formData, category: value})}
-                    >
-                      <SelectTrigger className="h-12 bg-white/5 border-white/20 hover:bg-white/10 transition-all">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categoryOptions[formData.type].map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Amount */}
-                  <div className="space-y-3">
-                    <Label htmlFor="amount" className="text-sm font-medium flex items-center gap-2">
-                      <Calculator className="h-4 w-4" />
-                      Amount *
-                    </Label>
-                    <div className="relative">
-                      <Input
-                        id="amount"
-                        type="number"
-                        placeholder="0.00"
-                        value={formData.amount}
-                        onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                        min="0"
-                        step="0.01"
-                        required
-                        className="h-12 pl-8 bg-white/5 border-white/20 hover:bg-white/10 transition-all"
-                      />
-                      <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">₹</span>
-                    </div>
-                  </div>
-
-                  {/* Payment Method */}
-                  <div className="space-y-3">
-                    <Label htmlFor="paymentMethod" className="text-sm font-medium flex items-center gap-2">
-                      <DollarSign className="h-4 w-4" />
-                      Payment Method *
-                    </Label>
-                    <Select 
-                      value={formData.paymentMethod} 
-                      onValueChange={(value) => setFormData({...formData, paymentMethod: value})}
-                    >
-                      <SelectTrigger className="h-12 bg-white/5 border-white/20 hover:bg-white/10 transition-all">
-                        <SelectValue placeholder="Select payment method" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {paymentMethods.map((method) => (
-                          <SelectItem key={method} value={method}>
-                            {method}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Date */}
-                  <div className="space-y-3">
-                    <Label htmlFor="date" className="text-sm font-medium flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Transaction Date *
-                    </Label>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Calculator className="h-4 w-4" />
+                    Amount *
+                  </Label>
+                  <div className="relative">
                     <Input
-                      id="date"
-                      type="date"
-                      value={formData.date}
-                      onChange={(e) => setFormData({...formData, date: e.target.value})}
+                      type="number"
+                      placeholder="0.00"
+                      value={formData.amount}
+                      onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                      min="0"
+                      step="0.01"
                       required
-                      className="h-12 bg-white/5 border-white/20 hover:bg-white/10 transition-all"
+                      className="pl-8"
                     />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
                   </div>
+                </div>
 
-                  {/* Status */}
-                  <div className="space-y-3">
-                    <Label htmlFor="status" className="text-sm font-medium">Status</Label>
-                    <Select 
-                      value={formData.status} 
-                      onValueChange={(value: 'completed' | 'pending' | 'failed') => 
-                        setFormData({...formData, status: value})
-                      }
-                    >
-                      <SelectTrigger className="h-12 bg-white/5 border-white/20 hover:bg-white/10 transition-all">
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="failed">Failed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Payment Method *</Label>
+                  <Select
+                    value={formData.paymentMethod}
+                    onValueChange={(v: any) => setFormData({ ...formData, paymentMethod: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {paymentMethods.map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Transaction Date *
+                  </Label>
+                  <Input
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Status</Label>
+                  <Select value={formData.status} onValueChange={(v: any) => setFormData({ ...formData, status: v })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="failed">Failed</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
-              {/* Additional Details */}
-              <div className="space-y-6">
-                <div className="border-b border-white/20 pb-4">
-                  <h3 className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Additional Details
-                  </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Optional information for better record keeping
-                  </p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Description *</Label>
+                  <Textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    rows={4}
+                    required
+                  />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Description */}
-                  <div className="space-y-3">
-                    <Label htmlFor="description" className="text-sm font-medium flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Description *
-                    </Label>
-                    <Textarea
-                      id="description"
-                      placeholder="Enter detailed transaction description..."
-                      value={formData.description}
-                      onChange={(e) => setFormData({...formData, description: e.target.value})}
-                      rows={4}
-                      required
-                      className="bg-white/5 border-white/20 hover:bg-white/10 transition-all resize-none"
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Reference</Label>
+                    <Input
+                      placeholder="Auto-generated if left empty"
+                      value={formData.reference}
+                      onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
                     />
                   </div>
-
-                  <div className="space-y-6">
-                    {/* Reference */}
-                    <div className="space-y-3">
-                      <Label htmlFor="reference" className="text-sm font-medium">Reference Number</Label>
+                  {formData.type === "tds" && (
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Tax Year</Label>
                       <Input
-                        id="reference"
-                        placeholder="Auto-generated if left empty"
-                        value={formData.reference}
-                        onChange={(e) => setFormData({...formData, reference: e.target.value})}
-                        className="h-12 bg-white/5 border-white/20 hover:bg-white/10 transition-all"
+                        placeholder="e.g., 2024-25"
+                        value={formData.taxYear}
+                        onChange={(e) => setFormData({ ...formData, taxYear: e.target.value })}
                       />
                     </div>
-
-                    {/* Tax Year (for TDS only) */}
-                    {formData.type === 'tds' && (
-                      <div className="space-y-3">
-                        <Label htmlFor="taxYear" className="text-sm font-medium">Tax Year</Label>
-                        <Input
-                          id="taxYear"
-                          placeholder="e.g., 2024-25"
-                          value={formData.taxYear}
-                          onChange={(e) => setFormData({...formData, taxYear: e.target.value})}
-                          className="h-12 bg-white/5 border-white/20 hover:bg-white/10 transition-all"
-                        />
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
 
-              {/* Form Actions */}
-              <div className="flex justify-end gap-4 pt-6 border-t border-white/20">
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setCurrentView('overview')}
-                  className="px-8"
-                >
+              <div className="flex justify-end gap-4 pt-6 border-t">
+                <Button type="button" variant="outline" onClick={() => setCurrentView("overview")}>
                   Cancel
                 </Button>
-                <Button 
-                  type="submit"
-                  className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 px-8"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Record
+                <Button disabled={creating || updating} type="submit">
+                  {formMode === "create" ? (
+                    <>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Record
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
                 </Button>
               </div>
             </form>
@@ -1010,46 +1046,46 @@ export function FinanceManagement() {
     );
   }
 
-  // Records View (detailed table)
+  /* =======================================================================
+   * RECORDS TABLE
+   * ======================================================================= */
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-8"
-    >
-      <Breadcrumb items={[...breadcrumbItems, { label: 'Finance', onClick: () => setCurrentView('overview') }]} currentPage="Finance Records" />
-      
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+      <Breadcrumb
+        items={[...breadcrumbItems, { label: "Finance", onClick: () => setCurrentView("overview") }]}
+        currentPage="Finance Records"
+      />
+
       <div className="flex items-center justify-between">
         <div className="space-y-2">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">
             Finance Records
           </h1>
-          <p className="text-muted-foreground">
-            Detailed view of all financial transactions
-          </p>
+          <p className="text-muted-foreground">Detailed view of all financial transactions</p>
         </div>
         <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => setCurrentView('overview')}>
+          <Button variant="outline" onClick={() => setCurrentView("overview")}>
             Back to Overview
           </Button>
-          <Button 
-            variant="outline"
-            className="border-blue-200 text-blue-700 hover:bg-blue-50"
-          >
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept=".csv,.json,application/json,text/csv"
+            className="hidden"
+            onChange={handleBulkFile}
+          />
+          <Button variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50" onClick={onBulkUploadClick}>
             <UploadCloud className="w-4 h-4 mr-2" />
             Bulk Upload
           </Button>
-          <Button 
-            onClick={() => setCurrentView('addRecord')}
-            className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700"
-          >
+          <Button onClick={startCreate} className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700">
             <Plus className="w-4 h-4 mr-2" />
             Add Record
           </Button>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters (records view) */}
       <GlassCard>
         <CardHeader>
           <CardTitle className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-2">
@@ -1058,11 +1094,10 @@ export function FinanceManagement() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Type Filter */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="space-y-2">
               <Label className="text-sm font-medium">Type</Label>
-              <Select value={selectedType} onValueChange={(value: 'invested' | 'expense' | 'tds' | 'all') => setSelectedType(value)}>
+              <Select value={selectedType} onValueChange={(v: any) => setSelectedType(v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -1075,7 +1110,6 @@ export function FinanceManagement() {
               </Select>
             </div>
 
-            {/* Category Filter */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Category</Label>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
@@ -1084,16 +1118,15 @@ export function FinanceManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {getAvailableCategories().map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
+                  {availableCategories.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Payment Method Filter */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Payment Method</Label>
               <Select value={selectedPaymentMethod} onValueChange={setSelectedPaymentMethod}>
@@ -1102,19 +1135,18 @@ export function FinanceManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Methods</SelectItem>
-                  {getAvailablePaymentMethods().map((method) => (
-                    <SelectItem key={method} value={method}>
-                      {method}
+                  {availablePaymentMethods.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Status Filter */}
             <div className="space-y-2">
               <Label className="text-sm font-medium">Status</Label>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <Select value={selectedStatus} onValueChange={(v: any) => setSelectedStatus(v)}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
@@ -1126,12 +1158,16 @@ export function FinanceManagement() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Search</Label>
+              <Input placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            </div>
           </div>
-          
-          {/* Results Counter */}
+
           <div className="mt-4 flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
-              Showing {filteredData.length} of {financeData.length} records
+              {isFetching ? "Loading…" : <>Showing {locallyFiltered.length} of {financeData.length} records</>}
             </div>
           </div>
         </CardContent>
@@ -1139,110 +1175,125 @@ export function FinanceManagement() {
 
       <GlassCard>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-white/5">
-                  <TableHead className="font-medium">Type</TableHead>
-                  <TableHead className="font-medium">Category</TableHead>
-                  <TableHead className="font-medium">Description</TableHead>
-                  <TableHead className="font-medium">Amount</TableHead>
-                  <TableHead className="font-medium">Payment Method</TableHead>
-                  <TableHead className="font-medium">Date</TableHead>
-                  <TableHead className="font-medium">Status</TableHead>
-                  <TableHead className="font-medium">Tax Year</TableHead>
-                  <TableHead className="font-medium text-center">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredData.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                      No records found matching the current filters
-                    </TableCell>
+          {financeData.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-white/5">
+                    <TableHead>Type</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Payment Method</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Tax Year</TableHead>
+                    <TableHead className="text-center">Actions</TableHead>
                   </TableRow>
-                ) : (
-                  filteredData
-                    .sort((a, b) => b.date.getTime() - a.date.getTime())
-                    .map((record, index) => (
-                      <motion.tr 
-                        key={record.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="hover:bg-white/5 transition-colors"
-                      >
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className={`p-1.5 rounded-md ${
-                              record.type === 'invested' ? 'bg-green-100 dark:bg-green-900/20' :
-                              record.type === 'expense' ? 'bg-red-100 dark:bg-red-900/20' :
-                              'bg-orange-100 dark:bg-orange-900/20'
-                            }`}>
-                              {record.type === 'invested' ? (
-                                <Wallet className="w-3 h-3 text-green-600" />
-                              ) : record.type === 'expense' ? (
-                                <TrendingDown className="w-3 h-3 text-red-600" />
-                              ) : (
-                                <Receipt className="w-3 h-3 text-orange-600" />
-                              )}
+                </TableHeader>
+                <TableBody>
+                  {locallyFiltered.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        No records found matching the current filters
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    locallyFiltered
+                      .slice()
+                      .sort((a, b) => b.date.getTime() - a.date.getTime())
+                      .map((r) => (
+                        <TableRow key={r.id} className="hover:bg-muted/50">
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`p-1.5 rounded-md ${
+                                  r.type === "invested"
+                                    ? "bg-green-100 dark:bg-green-900/20"
+                                    : r.type === "expense"
+                                    ? "bg-red-100 dark:bg-red-900/20"
+                                    : "bg-orange-100 dark:bg-orange-900/20"
+                                }`}
+                              >
+                                {r.type === "invested" ? (
+                                  <Wallet className="w-3 h-3 text-green-600" />
+                                ) : r.type === "expense" ? (
+                                  <TrendingDown className="w-3 h-3 text-red-600" />
+                                ) : (
+                                  <Receipt className="w-3 h-3 text-orange-600" />
+                                )}
+                              </div>
+                              <Badge className={getTypeColor(r.type)}>
+                                {r.type.charAt(0).toUpperCase() + r.type.slice(1)}
+                              </Badge>
                             </div>
-                            <Badge className={getTypeColor(record.type)}>
-                              {record.type.charAt(0).toUpperCase() + record.type.slice(1)}
+                          </TableCell>
+                          <TableCell className="font-medium">{r.category}</TableCell>
+                          <TableCell className="max-w-xs">
+                            <div className="truncate" title={r.description}>
+                              {r.description}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`font-semibold ${
+                                r.type === "invested"
+                                  ? "text-green-600"
+                                  : r.type === "expense"
+                                  ? "text-red-600"
+                                  : "text-orange-600"
+                              }`}
+                            >
+                              {r.type === "invested" ? "+" : "-"}
+                              {fmtINR(r.amount)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {r.paymentMethod}
                             </Badge>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-medium">{record.category}</TableCell>
-                        <TableCell className="max-w-xs">
-                          <div className="truncate" title={record.description}>
-                            {record.description}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className={`font-semibold ${
-                            record.type === 'invested' ? 'text-green-600' :
-                            record.type === 'expense' ? 'text-red-600' :
-                            'text-orange-600'
-                          }`}>
-                            {record.type === 'invested' ? '+' : '-'}₹{record.amount.toLocaleString()}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {record.paymentMethod}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {record.date.toLocaleDateString('en-IN', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(record.status)}>
-                            {record.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {record.taxYear || '-'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-center gap-1">
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                              <Edit className="w-3 h-3" />
-                            </Button>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-600 hover:text-red-700">
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </motion.tr>
-                    ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {r.date.toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={getStatusColor(r.status)}>{r.status}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">{(r as any).taxYear || "-"}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                onClick={() => startEdit(r)}
+                              >
+                                <Edit className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={removing}
+                                onClick={() => confirmDelete(r.id)}
+                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </GlassCard>
     </motion.div>

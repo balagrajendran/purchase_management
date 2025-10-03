@@ -7,6 +7,8 @@ import { clientsRouter } from './routes/clients.js';
 import purchasesRouter from "./routes/purchases.js";
 import invoicesRouter  from './routes/invoices.js';
 import { initFirestore } from './lib/firestore.js';
+import financeRoutes from "./routes/finance.js";
+import settingsRoutes from "./routes/settings.js";
 
 
 console.log('ENV PID', process.env.GCP_PROJECT_ID, process.env.FIRESTORE_DB_ID);
@@ -36,6 +38,8 @@ app.use('/api/health', healthRouter);
 app.use('/api/clients', clientsRouter);
 app.use('/api/purchases', purchasesRouter);
 app.use('/api/invoices', invoicesRouter);
+app.use("/api/finance", financeRoutes);
+app.use("/api/settings", settingsRoutes);
 
 // 404
 app.use((req, res) => {
