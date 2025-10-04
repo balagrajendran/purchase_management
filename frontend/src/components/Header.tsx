@@ -231,7 +231,7 @@ export function Header({ currentPage, onPageChange, user, onLogout }: HeaderProp
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full bg-white/30 dark:bg-gray-800/30 hover:bg-white/50 dark:hover:bg-gray-800/50 p-0">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src="/api/placeholder/32/32" alt="User" />
+                      {/* <AvatarImage src="/api/placeholder/32/32" alt="User" /> */}
                       <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
                         {user?.email ? user.email.charAt(0).toUpperCase() : 'U'}
                       </AvatarFallback>

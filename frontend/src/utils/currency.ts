@@ -21,7 +21,7 @@ export const SUPPORTED_CURRENCIES: CurrencyInfo[] = [
   { code: 'CNY', symbol: '¥', name: 'Chinese Yuan', rate: 0.087 },
 ];
 
-export const DEFAULT_CURRENCY = 'INR';
+export const DEFAULT_CURRENCY = 'INR' as const;
 
 export function getCurrencyInfo(currencyCode: string): CurrencyInfo {
   return SUPPORTED_CURRENCIES.find(currency => currency.code === currencyCode) || SUPPORTED_CURRENCIES[0];
@@ -36,29 +36,30 @@ export function convertCurrency(amount: number, fromCurrency: string, toCurrency
   return inrAmount * toRate;
 }
 
-export function formatCurrency(amount: number, currencyCode: string): string {
+export function formatCurrency(amount: number | null | undefined, currencyCode: string = DEFAULT_CURRENCY): string {
   const currency = getCurrencyInfo(currencyCode);
   
+  const num = Number.isFinite(amount as number) ? (amount as number) : 0;
   // Format based on currency
   switch (currencyCode) {
     case 'INR':
-      return `${currency.symbol}${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `${currency.symbol}${num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     case 'USD':
     case 'AUD':
     case 'CAD':
     case 'SGD':
-      return `${currency.symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `${currency.symbol}${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     case 'EUR':
-      return `${currency.symbol}${amount.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `${currency.symbol}${num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     case 'GBP':
-      return `${currency.symbol}${amount.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `${currency.symbol}${num.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     case 'JPY':
     case 'CNY':
-      return `${currency.symbol}${amount.toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+      return `${currency.symbol}${num.toLocaleString('ja-JP', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
     case 'CHF':
-      return `${amount.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency.symbol}`;
+      return `${num.toLocaleString('de-CH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency.symbol}`;
     default:
-      return `${currency.symbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `${currency.symbol}${num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 }
 

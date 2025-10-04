@@ -54,6 +54,7 @@ import {
   useDeletePurchaseMutation,
 } from '../lib/api/slices/purchases';
 import { useListClientsQuery } from '../lib/api/slices/clients';
+import { formatDate } from '../utils/datetime';
 
 export function PurchaseManagement() {
   const [currentView, setCurrentView] = useState<'list' | 'add' | 'edit' | 'view'>('list');
@@ -757,7 +758,8 @@ export function PurchaseManagement() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-muted-foreground">
-                              {new Date(purchase.createdAt as any).toLocaleDateString()}
+                              {/* {new Date(purchase.createdAt as any).toLocaleDateString()} */}
+                              {formatDate(purchase?.createdAt)}
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center justify-center space-x-2">
@@ -1323,12 +1325,15 @@ Standing Desk,FlexiDesk Height Adjustable,5,599.99,pcs`}
                   <Label className="text-sm font-medium text-muted-foreground">Created Date</Label>
                   <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span>{(viewPurchase.createdAt as any as Date).toLocaleDateString('en-IN', { 
+                    <span>
+                      {/* {(viewPurchase.createdAt as any as Date).toLocaleDateString('en-IN', { 
                       weekday: 'long',
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'
-                    })}</span>
+                    })} */}
+                    {formatDate(viewPurchase?.createdAt)}
+                    </span>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -1500,14 +1505,15 @@ Standing Desk,FlexiDesk Height Adjustable,5,599.99,pcs`}
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">Created</Label>
                       <p className="text-sm text-muted-foreground">
-                        {(viewPurchase.createdAt as any as Date).toLocaleString('en-IN', {
+                        {/* {(viewPurchase.createdAt as any as Date).toLocaleString('en-IN', {
                           weekday: 'short',
                           year: 'numeric',
                           month: 'short',
                           day: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit'
-                        })}
+                        })} */}
+                        {formatDate(viewPurchase?.createdAt)}
                       </p>
                     </div>
                     <div>

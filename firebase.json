@@ -1,10 +1,14 @@
 {
   "functions": { "source": "functions" },
   "hosting": {
+    "site": "purchase-management-fedhub",
     "public": "frontend/build",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "ignore": ["**/.*", "**/node_modules/**"],
     "rewrites": [
-      { "source": "/api{,/**}", "function": { "functionId": "api", "region": "asia-south1" } },
+      {
+        "source": "/api/**",
+        "function": { "functionId": "api", "region": "asia-south1" }
+      },
       { "source": "**", "destination": "/index.html" }
     ]
   },
