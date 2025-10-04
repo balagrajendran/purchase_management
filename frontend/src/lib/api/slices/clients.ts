@@ -1,21 +1,22 @@
 // src/lib/api/client.ts
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { Client } from '../../../types';
+import { API_BASE } from './base';
 
 export interface Paginated<T> {
   items: T[];
   nextPageToken?: string | null;
 }
 
-const API_BASE_URL =
-  (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8080/api';
+// const API_BASE_URL =
+//   (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
 export type CreateClientRequest = Omit<Client, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateClientRequest = Partial<Omit<Client, 'id' | 'createdAt' | 'updatedAt'>>;
 
 export const clientApi = createApi({
   reducerPath: 'clientApi',
-  baseQuery: fetchBaseQuery({ baseUrl: API_BASE_URL }),
+  baseQuery: fetchBaseQuery({ baseUrl: API_BASE }),
   tagTypes: ['Client'],
   endpoints: (builder) => ({
     listClients: builder.query<Paginated<Client>, { limit?: number; pageToken?: string } | void>({

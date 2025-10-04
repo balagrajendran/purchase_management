@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { AnimatedBackground } from './AnimatedBackground';
 import { toast } from 'sonner';
+import { API_BASE } from '../lib/api/slices/base';
 
 interface LoginProps {
   onLogin: (credentials: { email: string; password: string; rememberMe: boolean }) => void;
@@ -35,7 +36,7 @@ type LoginResponse = {
   };
 };
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8080/api';
+//const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:8080/api';
 
 export function Login({ onLogin }: LoginProps) {
   const [email, setEmail] = useState('');
@@ -64,7 +65,7 @@ export function Login({ onLogin }: LoginProps) {
     setIsLoading(true);
     setErrors({});
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password }),
@@ -310,7 +311,7 @@ export function Login({ onLogin }: LoginProps) {
 export async function logout() {
   const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
   try {
-    await fetch(`${API_BASE_URL}/auth/logout`, {
+    await fetch(`${API_BASE}/auth/logout`, {
       method: 'POST',
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });

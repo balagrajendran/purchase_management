@@ -1,4 +1,5 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { API_BASE } from './base';
 
 /* -------- Types -------- */
 export type FinType = "invested" | "expense" | "tds";
@@ -33,8 +34,8 @@ export interface Paginated<T> {
 }
 
 /* -------- Helpers -------- */
-const API_BASE_URL =
-  (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8080/api";
+// const API_BASE_URL =
+//   (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8080/api";
 
 /* -------- API -------- */
 export type ListFinanceArgs = {
@@ -53,7 +54,7 @@ export type UpdateFinanceRequest = Partial<Omit<FinanceRecord, "id" | "createdAt
 
 export const financeApi = createApi({
   reducerPath: "financeApi",
-  baseQuery: fetchBaseQuery({ baseUrl: API_BASE_URL }),
+  baseQuery: fetchBaseQuery({ baseUrl: API_BASE }),
   tagTypes: ["Finance"],
   endpoints: (builder) => ({
     listFinance: builder.query<Paginated<FinanceRecord>, ListFinanceArgs | void>({

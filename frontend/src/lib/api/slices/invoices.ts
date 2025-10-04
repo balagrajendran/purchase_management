@@ -1,6 +1,7 @@
 // src/lib/api/slices/invoices.ts
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { Invoice } from "../../../types";
+import { API_BASE } from './base';
 
 export interface Paginated<T> {
   items: T[];
@@ -8,8 +9,8 @@ export interface Paginated<T> {
   total?: number;
 }
 
-const API_BASE_URL =
-  (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8080/api";
+// const API_BASE_URL =
+//   (import.meta as any).env?.VITE_API_BASE_URL || "http://localhost:8080/api";
 
 /** ---- helpers ---- */
 const toIso = (v: any): string => {
@@ -71,7 +72,7 @@ type UpdateInvoiceRequest = Partial<Invoice> & {
 
 export const invoiceApi = createApi({
   reducerPath: "invoiceApi",
-  baseQuery: fetchBaseQuery({ baseUrl: API_BASE_URL }),
+  baseQuery: fetchBaseQuery({ baseUrl: API_BASE }),
   tagTypes: ["Invoice"],
   endpoints: (builder) => ({
     /** LIST: GET /invoices (supports filters) */

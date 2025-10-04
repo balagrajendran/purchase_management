@@ -1,7 +1,15 @@
 {
-  "firestore": {
-    "database": "purchase-management-db",
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  }
+  "functions": { "source": "functions" },
+  "hosting": {
+    "public": "frontend/build",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/api{,/**}", "function": { "functionId": "api", "region": "asia-south1" } },
+      { "source": "**", "destination": "/index.html" }
+    ]
+  },
+  "predeploy": [
+    "npm --prefix frontend ci",
+    "npm --prefix frontend run build"
+  ]
 }

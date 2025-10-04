@@ -1,5 +1,6 @@
 // src/api/slices/settings.ts
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { API_BASE } from './base';
 
 /* -----------------------------------------------------------------------------
  * Types
@@ -43,11 +44,11 @@ export type UpdateSettingsRequest = Partial<AppSettings>;
 /* -----------------------------------------------------------------------------
  * Config
  * -------------------------------------------------------------------------- */
-const API_BASE_URL =
-  // vite
-  (import.meta as any).env?.VITE_API_BASE_URL ||
-  // fallback for local dev
-  "http://localhost:8080/api";
+// const API_BASE_URL =
+//   // vite
+//   (import.meta as any).env?.VITE_API_BASE_URL ||
+//   // fallback for local dev
+//   "http://localhost:8080/api";
 
 /* -----------------------------------------------------------------------------
  * Helpers
@@ -116,7 +117,7 @@ const normalize = (raw: any): AppSettings => {
 export const settingsApi = createApi({
   reducerPath: "settingsApi",
   baseQuery: fetchBaseQuery({
-    baseUrl: API_BASE_URL,
+    baseUrl: API_BASE,
     prepareHeaders: (headers) => {
       headers.set("Content-Type", "application/json");
       return headers;
