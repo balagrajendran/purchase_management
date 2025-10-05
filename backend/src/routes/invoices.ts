@@ -1,7 +1,7 @@
 // backend/src/routes/invoices.ts
 import { Router, Request, Response } from "express";
 import admin from "firebase-admin";
-import { getDb } from "../lib/firestore.js";
+import { getDb } from "../firestore.js";
 
 const router = Router();
 const COL = "invoices";

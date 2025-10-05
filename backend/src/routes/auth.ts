@@ -30,9 +30,9 @@ type MasterStore = {
 
 /* -----------------------------------------------------------------------------
    Tiny file-based “master table” store (no extra deps).
-   File lives at: backend/data/master.json (created on first run).
+   File lives at: mock/data/master.json (created on first run).
 ----------------------------------------------------------------------------- */
-const DATA_DIR = path.resolve(process.cwd(), "backend", "data");
+const DATA_DIR = path.resolve(process.cwd(), "mock", "data");
 const STORE_FILE = path.join(DATA_DIR, "master.json");
 
 function readStore(): MasterStore {

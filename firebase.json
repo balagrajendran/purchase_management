@@ -1,18 +1,51 @@
 {
-  "functions": { "source": "functions" },
+  "functions": [
+    {
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "secretEnvironmentVariables": [
+        {
+          "key": "purchase-management-db"
+        }
+      ],
+      "source": "functions",
+      "runtime": "nodejs20",
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ],
   "hosting": {
     "site": "purchase-management-fedhub",
     "public": "frontend/build",
-    "ignore": ["**/.*", "**/node_modules/**"],
+    "ignore": [
+      "**/.*",
+      "**/node_modules/**"
+    ],
     "rewrites": [
       {
         "source": "/api/**",
-        "function": { "functionId": "api", "region": "asia-south1" }
+        "function": {
+          "functionId": "api",
+          "region": "asia-south1"
+        }
       },
-      { "source": "**", "destination": "/index.html" }
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
     ]
   },
   "predeploy": [
+    "npm --prefix functions ci",
+    "npm --prefix functions run build",
     "npm --prefix frontend ci",
     "npm --prefix frontend run build"
   ]

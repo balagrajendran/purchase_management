@@ -1,7 +1,7 @@
 // backend/src/routes/finance.ts
 import { Router, Request, Response } from "express";
 import admin from "firebase-admin";
-import { db } from "../lib/firestore.js";
+import { db } from "../firestore.js";
 
 const router = Router();
 const COL = "finance"; // collection name

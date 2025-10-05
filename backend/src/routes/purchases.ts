@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import admin from 'firebase-admin';
-import { db } from '../lib/firestore.js';
+import { db } from '../firestore.js';
 import type { Purchase, PurchaseItem } from '../types.js';
 
 const router = Router();

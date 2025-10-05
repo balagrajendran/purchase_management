@@ -1,4 +1,3 @@
-// src/lib/api/slices/purchases.ts
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { Purchase } from "../../../types";
 import { API_BASE } from './base';

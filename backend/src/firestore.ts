@@ -1,4 +1,4 @@
-// src/lib/firestore.ts
+// src/firestore.ts
 import 'dotenv/config';
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -65,7 +65,7 @@ export async function initFirestore() {
   }
 
   _db = getFirestore(admin.app(), (process.env.FIRESTORE_DB_ID || '(default)') as any);
-  // @ts-expect-error option exists at runtime
+  
   _db.settings({ ignoreUndefinedProperties: true });
 
   const effectiveProjectId =

@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { db } from '../lib/firestore.js';
+import { db } from '../firestore.js';
 import { z } from 'zod';
-import { parseListParams, paginate, sendZodError } from '../lib/common.js';
+import { parseListParams, paginate, sendZodError } from '../common.js';
 import type { Client } from '../types.js';
 
 export const clientsRouter = Router();

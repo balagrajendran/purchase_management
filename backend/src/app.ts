@@ -12,7 +12,7 @@ import {clientsRouter} from "./routes/clients.js";
 import purchasesRouter from "./routes/purchases.js";
 import invoicesRouter from "./routes/invoices.js";
 import financeRouter from "./routes/finance.js";
-import { initFirestore } from "./lib/firestore.js";
+import { initFirestore } from "./firestore.js";
 
 export const app = express();
 
