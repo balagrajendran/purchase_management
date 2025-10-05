@@ -1,4 +1,8 @@
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '../.env.local-only' });
+
 import { app } from './app.js';
+
 
 const PORT = process.env.PORT || 8080;
 

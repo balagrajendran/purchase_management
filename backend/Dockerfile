@@ -19,4 +19,4 @@ COPY --from=build /app/node_modules ./node_modules
 # if you read templates/assets, copy them too
 # COPY ./assets ./assets
 EXPOSE 8080
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/index.js"]

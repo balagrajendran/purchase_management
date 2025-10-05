@@ -145,7 +145,6 @@ export const purchaseApi = createApi({
         // single query
         if (!statuses || statuses.length === 0) {
           const one = await runOnce();
-          // @ts-expect-error - union of success/error
           return one.error ? { error: one.error } : { data: one.data };
         }
 
@@ -153,7 +152,6 @@ export const purchaseApi = createApi({
         const collected: Record<string, Purchase> = {};
         for (const s of statuses) {
           const r = await runOnce(s);
-          // @ts-expect-error
           if (r.error) return { error: r.error };
           (r.data as Purchase[]).forEach((p) => (collected[p.id] = p));
         }
